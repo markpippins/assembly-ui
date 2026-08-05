@@ -1,0 +1,8 @@
+{
+  "name": "Assembly UI",
+  "description": "Angular application for Assembly - Forums, Feed, Agendas, Requirements, and Work Requests management",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
