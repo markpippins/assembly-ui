@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ThemeProvider } from './context/ThemeContext';
@@ -10,37 +10,52 @@ import { Sidebar } from './components/Sidebar';
 import { ToastContainer } from './components/ToastContainer';
 import { SearchModal } from './components/SearchModal';
 import { Breadcrumbs } from './components/Breadcrumbs';
+import { SkeletonLoader } from './components/SkeletonLoader';
 
-import { FeedView } from './views/FeedView';
-import { ForumsView } from './views/ForumsView';
-import { ForumDetailView } from './views/ForumDetailView';
-import { ThreadDetailView } from './views/ThreadDetailView';
-import { WorkRequestsView } from './views/WorkRequestsView';
-import { WorkRequestDetailView } from './views/WorkRequestDetailView';
-import { RequirementsView } from './views/RequirementsView';
-import { AgendasView } from './views/AgendasView';
-import { CandidatesView } from './views/CandidatesView';
-import { HarvestsView } from './views/HarvestsView';
-import { HarvestDetailView } from './views/HarvestDetailView';
-import { ConversationsView } from './views/ConversationsView';
-import { OpenQuestionsView } from './views/OpenQuestionsView';
-import { OpenQuestionDetailView } from './views/OpenQuestionDetailView';
-import { ResolutionsView } from './views/ResolutionsView';
-import { IntentsView } from './views/IntentsView';
-import { AssessmentsView } from './views/AssessmentsView';
-import { ObservationsView } from './views/ObservationsView';
-import { AgentRecordsView } from './views/AgentRecordsView';
-import { ReportsView } from './views/ReportsView';
-import { SpecificationsView } from './views/SpecificationsView';
-import { SpecificationDetailView } from './views/SpecificationDetailView';
-import { PlansView } from './views/PlansView';
-import { PlanDetailView } from './views/PlanDetailView';
-import { SpecsView } from './views/SpecsView';
-import { EntityDetailView } from './views/EntityDetailView';
-import { ProfileView } from './views/ProfileView';
-import { SettingsView } from './views/SettingsView';
-import { SearchView } from './views/SearchView';
+// ── Lazy-loaded route views (code-split per route) ──────────────────
+// Each view is a separate chunk, loaded on demand when the route is visited.
+// SkeletonLoader provides a consistent loading state during chunk fetch.
 
+const FeedView = lazy(() => import('./views/FeedView').then(m => ({ default: m.FeedView })));
+const ForumsView = lazy(() => import('./views/ForumsView').then(m => ({ default: m.ForumsView })));
+const ForumDetailView = lazy(() => import('./views/ForumDetailView').then(m => ({ default: m.ForumDetailView })));
+const ThreadDetailView = lazy(() => import('./views/ThreadDetailView').then(m => ({ default: m.ThreadDetailView })));
+const WorkRequestsView = lazy(() => import('./views/WorkRequestsView').then(m => ({ default: m.WorkRequestsView })));
+const WorkRequestDetailView = lazy(() => import('./views/WorkRequestDetailView').then(m => ({ default: m.WorkRequestDetailView })));
+const RequirementsView = lazy(() => import('./views/RequirementsView').then(m => ({ default: m.RequirementsView })));
+const AgendasView = lazy(() => import('./views/AgendasView').then(m => ({ default: m.AgendasView })));
+const CandidatesView = lazy(() => import('./views/CandidatesView').then(m => ({ default: m.CandidatesView })));
+const HarvestsView = lazy(() => import('./views/HarvestsView').then(m => ({ default: m.HarvestsView })));
+const HarvestDetailView = lazy(() => import('./views/HarvestDetailView').then(m => ({ default: m.HarvestDetailView })));
+const ConversationsView = lazy(() => import('./views/ConversationsView').then(m => ({ default: m.ConversationsView })));
+const OpenQuestionsView = lazy(() => import('./views/OpenQuestionsView').then(m => ({ default: m.OpenQuestionsView })));
+const OpenQuestionDetailView = lazy(() => import('./views/OpenQuestionDetailView').then(m => ({ default: m.OpenQuestionDetailView })));
+const ResolutionsView = lazy(() => import('./views/ResolutionsView').then(m => ({ default: m.ResolutionsView })));
+const IntentsView = lazy(() => import('./views/IntentsView').then(m => ({ default: m.IntentsView })));
+const AssessmentsView = lazy(() => import('./views/AssessmentsView').then(m => ({ default: m.AssessmentsView })));
+const ObservationsView = lazy(() => import('./views/ObservationsView').then(m => ({ default: m.ObservationsView })));
+const AgentRecordsView = lazy(() => import('./views/AgentRecordsView').then(m => ({ default: m.AgentRecordsView })));
+const ReportsView = lazy(() => import('./views/ReportsView').then(m => ({ default: m.ReportsView })));
+const SpecificationsView = lazy(() => import('./views/SpecificationsView').then(m => ({ default: m.SpecificationsView })));
+const SpecificationDetailView = lazy(() => import('./views/SpecificationDetailView').then(m => ({ default: m.SpecificationDetailView })));
+const PlansView = lazy(() => import('./views/PlansView').then(m => ({ default: m.PlansView })));
+const PlanDetailView = lazy(() => import('./views/PlanDetailView').then(m => ({ default: m.PlanDetailView })));
+const SpecsView = lazy(() => import('./views/SpecsView').then(m => ({ default: m.SpecsView })));
+const EntityDetailView = lazy(() => import('./views/EntityDetailView').then(m => ({ default: m.EntityDetailView })));
+const ProfileView = lazy(() => import('./views/ProfileView').then(m => ({ default: m.ProfileView })));
+const SettingsView = lazy(() => import('./views/SettingsView').then(m => ({ default: m.SettingsView })));
+const SearchView = lazy(() => import('./views/SearchView').then(m => ({ default: m.SearchView })));
+
+// ── Route-level Suspense fallback ───────────────────────────────────
+function RouteFallback() {
+  return (
+    <div className="max-w-5xl mx-auto py-6 px-4">
+      <SkeletonLoader type="list" count={3} />
+    </div>
+  );
+}
+
+// ── AnimatedRoutes ───────────────────────────────────────────────────
 function AnimatedRoutes() {
   const location = useLocation();
 
@@ -54,88 +69,160 @@ function AnimatedRoutes() {
         transition={{ duration: 0.22, ease: [0.25, 1, 0.5, 1] }}
         className="w-full h-full"
       >
-        <Routes location={location}>
-          <Route path="/" element={<Navigate to="/feed" replace />} />
-          <Route path="/feed" element={<FeedView />} />
+        <Suspense fallback={<RouteFallback />}>
+          <Routes location={location}>
+            <Route path="/" element={<Navigate to="/feed" replace />} />
+            <Route path="/feed" element={<FeedView />} />
 
-          {/* Forums */}
-          <Route path="/forums" element={<ForumsView />} />
-          <Route path="/forums/:slug" element={<ForumDetailView />} />
-          <Route path="/forums/:slug/:threadId" element={<ThreadDetailView />} />
+            {/* Forums */}
+            <Route path="/forums" element={<ForumsView />} />
+            <Route path="/forums/:slug" element={<ForumDetailView />} />
+            <Route path="/forums/:slug/:threadId" element={<ThreadDetailView />} />
 
-          {/* Work Requests */}
-          <Route path="/work-requests" element={<WorkRequestsView />} />
-          <Route path="/work-requests/:id" element={<WorkRequestDetailView />} />
+            {/* Work Requests */}
+            <Route path="/work-requests" element={<WorkRequestsView />} />
+            <Route path="/work-requests/:id" element={<WorkRequestDetailView />} />
 
-          {/* Requirements */}
-          <Route path="/requirements" element={<RequirementsView />} />
-          <Route path="/requirements/:id" element={<EntityDetailView />} />
+            {/* Requirements */}
+            <Route path="/requirements" element={<RequirementsView />} />
+            <Route path="/requirements/:id" element={<EntityDetailView />} />
 
-          {/* Agendas */}
-          <Route path="/agendas" element={<AgendasView />} />
-          <Route path="/agendas/:id" element={<EntityDetailView />} />
+            {/* Agendas */}
+            <Route path="/agendas" element={<AgendasView />} />
+            <Route path="/agendas/:id" element={<EntityDetailView />} />
 
-          {/* Candidates */}
-          <Route path="/candidates" element={<CandidatesView />} />
-          <Route path="/candidates/:id" element={<EntityDetailView />} />
+            {/* Candidates */}
+            <Route path="/candidates" element={<CandidatesView />} />
+            <Route path="/candidates/:id" element={<EntityDetailView />} />
 
-          {/* Harvests */}
-          <Route path="/harvests" element={<HarvestsView />} />
-          <Route path="/harvests/:id" element={<HarvestDetailView />} />
+            {/* Harvests */}
+            <Route path="/harvests" element={<HarvestsView />} />
+            <Route path="/harvests/:id" element={<HarvestDetailView />} />
 
-          {/* Conversations */}
-          <Route path="/conversations" element={<ConversationsView />} />
-          <Route path="/conversations/:id" element={<EntityDetailView />} />
+            {/* Conversations */}
+            <Route path="/conversations" element={<ConversationsView />} />
+            <Route path="/conversations/:id" element={<EntityDetailView />} />
 
-          {/* Open Questions */}
-          <Route path="/open-questions" element={<OpenQuestionsView />} />
-          <Route path="/open-questions/:id" element={<OpenQuestionDetailView />} />
+            {/* Open Questions */}
+            <Route path="/open-questions" element={<OpenQuestionsView />} />
+            <Route path="/open-questions/:id" element={<OpenQuestionDetailView />} />
 
-          {/* Resolutions */}
-          <Route path="/resolutions" element={<ResolutionsView />} />
+            {/* Resolutions */}
+            <Route path="/resolutions" element={<ResolutionsView />} />
 
-          {/* Intents */}
-          <Route path="/intents" element={<IntentsView />} />
-          <Route path="/intents/:id" element={<EntityDetailView />} />
+            {/* Intents */}
+            <Route path="/intents" element={<IntentsView />} />
+            <Route path="/intents/:id" element={<EntityDetailView />} />
 
-          {/* Assessments */}
-          <Route path="/assessments" element={<AssessmentsView />} />
-          <Route path="/assessments/:id" element={<EntityDetailView />} />
+            {/* Assessments */}
+            <Route path="/assessments" element={<AssessmentsView />} />
+            <Route path="/assessments/:id" element={<EntityDetailView />} />
 
-          {/* Observations */}
-          <Route path="/observations" element={<ObservationsView />} />
-          <Route path="/observations/:id" element={<EntityDetailView />} />
+            {/* Observations */}
+            <Route path="/observations" element={<ObservationsView />} />
+            <Route path="/observations/:id" element={<EntityDetailView />} />
 
-          {/* Agent Records & Reports */}
-          <Route path="/agent-records" element={<AgentRecordsView />} />
-          <Route path="/agent-records/:id" element={<EntityDetailView />} />
-          <Route path="/reports" element={<ReportsView />} />
+            {/* Agent Records & Reports */}
+            <Route path="/agent-records" element={<AgentRecordsView />} />
+            <Route path="/agent-records/:id" element={<EntityDetailView />} />
+            <Route path="/reports" element={<ReportsView />} />
 
-          {/* Specifications */}
-          <Route path="/specifications" element={<SpecificationsView />} />
-          <Route path="/specifications/:id" element={<SpecificationDetailView />} />
+            {/* Specifications */}
+            <Route path="/specifications" element={<SpecificationsView />} />
+            <Route path="/specifications/:id" element={<SpecificationDetailView />} />
 
-          {/* Plans */}
-          <Route path="/plans" element={<PlansView />} />
-          <Route path="/plans/:id" element={<PlanDetailView />} />
+            {/* Plans */}
+            <Route path="/plans" element={<PlansView />} />
+            <Route path="/plans/:id" element={<PlanDetailView />} />
 
-          {/* Specs */}
-          <Route path="/specs" element={<SpecsView />} />
-          <Route path="/specs/:id" element={<EntityDetailView />} />
+            {/* Specs */}
+            <Route path="/specs" element={<SpecsView />} />
+            <Route path="/specs/:id" element={<EntityDetailView />} />
 
-          {/* Users & Utility */}
-          <Route path="/users/:id" element={<ProfileView />} />
-          <Route path="/profile/:id" element={<ProfileView />} />
-          <Route path="/settings" element={<SettingsView />} />
-          <Route path="/search" element={<SearchView />} />
+            {/* Users & Utility */}
+            <Route path="/users/:id" element={<ProfileView />} />
+            <Route path="/profile/:id" element={<ProfileView />} />
+            <Route path="/settings" element={<SettingsView />} />
+            <Route path="/search" element={<SearchView />} />
 
-          {/* Fallback */}
-          <Route path="*" element={<Navigate to="/feed" replace />} />
-        </Routes>
+            {/* Fallback */}
+            <Route path="*" element={<Navigate to="/feed" replace />} />
+          </Routes>
+        </Suspense>
       </motion.div>
     </AnimatePresence>
   );
 }
+
+// ── Health banner (T-Assembly-UI-03) ─────────────────────────────────
+// Polls /api/health every 15 s in live mode. In mock mode the poller is
+// suppressed (mock is always healthy by construction).
+function HealthBanner() {
+  const [unhealthy, setUnhealthy] = useState(false);
+  const [checking, setChecking] = useState(false);
+
+  useEffect(() => {
+    // Only poll in live mode. In mock mode, the UI is always healthy.
+    const mode = import.meta.env.ASSEMBLY_MODE || 'mock';
+    if (mode !== 'live') return;
+
+    let mounted = true;
+
+    async function check() {
+      if (!mounted) return;
+      try {
+        const res = await fetch('/api/health', { signal: AbortSignal.timeout(5000) });
+        if (mounted) setUnhealthy(!res.ok);
+      } catch {
+        if (mounted) setUnhealthy(true);
+      }
+    }
+
+    // Initial check after 3 s (let the page settle)
+    const initialTimer = setTimeout(() => { check(); }, 3000);
+
+    // Poll every 15 s
+    const interval = setInterval(check, 15000);
+
+    return () => {
+      mounted = false;
+      clearTimeout(initialTimer);
+      clearInterval(interval);
+    };
+  }, []);
+
+  const handleRetry = async () => {
+    setChecking(true);
+    try {
+      const res = await fetch('/api/health', { signal: AbortSignal.timeout(5000) });
+      setUnhealthy(!res.ok);
+    } catch {
+      setUnhealthy(true);
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  if (!unhealthy) return null;
+
+  return (
+    <div className="sticky top-14 z-30 w-full bg-amber-50 dark:bg-amber-950/80 border-b border-amber-200 dark:border-amber-800 px-4 py-2 flex items-center justify-between text-sm">
+      <div className="flex items-center gap-2 text-amber-800 dark:text-amber-200">
+        <span className="inline-block w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+        <span className="font-medium text-xs">Backend unreachable — data may be stale</span>
+      </div>
+      <button
+        onClick={handleRetry}
+        disabled={checking}
+        className="px-3 py-1 text-xs font-medium bg-amber-200 dark:bg-amber-800 text-amber-900 dark:text-amber-100 rounded-md hover:bg-amber-300 dark:hover:bg-amber-700 disabled:opacity-50 transition-colors"
+      >
+        {checking ? 'Checking…' : 'Retry'}
+      </button>
+    </div>
+  );
+}
+
+// ── App ──────────────────────────────────────────────────────────────
 
 export function App() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -160,6 +247,7 @@ export function App() {
             <RecentlyViewedProvider>
               <div className="h-screen overflow-hidden bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans flex flex-col selection:bg-indigo-500 selection:text-white transition-colors duration-200">
                 <Header onOpenSearch={() => setIsSearchOpen(true)} />
+                <HealthBanner />
                 <SearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
                 <div className="flex-1 flex min-h-0 overflow-hidden">
                   <Sidebar />
@@ -177,4 +265,5 @@ export function App() {
     </ThemeProvider>
   );
 }
+
 export default App;

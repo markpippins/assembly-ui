@@ -35,6 +35,8 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
+    // Allow ASSEMBLY_ prefixed env vars in import.meta.env (in addition to VITE_).
+    envPrefix: ['VITE_', 'ASSEMBLY_'],
     server: {
       host: "0.0.0.0",
       port,
@@ -43,6 +45,14 @@ export default defineConfig(({ mode }) => {
       // websocket; an empty `watch.ignored` alone does not.
       ...(disableHmr ? { hmr: false, watch: { ignored: ["**/*"] } } : {}),
       proxy,
+    },
+    build: {
+      // Route-level code-splitting is active (React.lazy on all views).
+      // The remaining ~500 KB chunk is React + React Router + framer-motion +
+      // lucide-react — vendor deps that can't be split further without
+      // manualChunks. Bump the warning threshold to suppress the cosmetic
+      // Vite warning. (T-Assembly-UI-05)
+      chunkSizeWarningLimit: 600,
     },
   };
 });
