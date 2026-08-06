@@ -31,7 +31,9 @@ import {
 import { PageHeader } from '../components/PageHeader';
 import { TTSButton } from '../components/TTSButton';
 import { Tooltip } from '../components/Tooltip';
+import { MarkdownRenderer } from '../components/MarkdownRenderer';
 import { dataService } from '../services/dataService';
+import { formatDateTime } from '../utils/format';
 import { useToast } from '../context/ToastContext';
 import { Harvest } from '../types';
 
@@ -61,7 +63,7 @@ const ItemContextMenu: React.FC<ItemContextMenuProps> = ({
     <div className="relative inline-block context-menu-container">
       <button
         onClick={onToggleOpen}
-        className={`p-1.5 rounded-lg border text-xs transition-all cursor-pointer flex items-center justify-center ${
+        className={`p-1.5 rounded-lg border text-sm transition-all cursor-pointer flex items-center justify-center ${
           isOpen
             ? 'bg-indigo-50 dark:bg-indigo-950 border-indigo-300 dark:border-indigo-700 text-indigo-600 dark:text-indigo-400'
             : 'bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
@@ -72,7 +74,7 @@ const ItemContextMenu: React.FC<ItemContextMenuProps> = ({
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 top-full mt-1.5 w-48 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl z-50 py-1.5 text-xs font-sans animate-in fade-in zoom-in-95 duration-100">
+        <div className="absolute right-0 top-full mt-1.5 w-48 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl z-50 py-1.5 text-sm font-sans animate-in fade-in zoom-in-95 duration-100">
           <div className="px-3 py-1 text-[10px] font-mono uppercase tracking-wider font-semibold text-slate-400 border-b border-slate-100 dark:border-slate-800 mb-1 truncate">
             {itemTitle}
           </div>
@@ -157,7 +159,7 @@ export const HarvestDetailView: React.FC = () => {
       const isFlagged = !prev[itemKey];
       showToast(
         isFlagged ? `Flagged "${label}" for review` : `Removed flag from "${label}"`,
-        isFlagged ? 'warning' : 'info'
+        'info'
       );
       return { ...prev, [itemKey]: isFlagged };
     });
@@ -167,10 +169,10 @@ export const HarvestDetailView: React.FC = () => {
   if (!harvest) {
     return (
       <div className="max-w-4xl mx-auto py-12 px-4 text-center space-y-4">
-        <p className="text-sm text-slate-400">Harvest details not found for ID: {id}</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400">Harvest details not found for ID: {id}</p>
         <Link
           to="/harvests"
-          className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-xs font-semibold rounded-xl hover:bg-indigo-500 transition-all"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-500 transition-all"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>Return to Artifact Harvests</span>
@@ -238,7 +240,7 @@ export const HarvestDetailView: React.FC = () => {
   return (
     <div className="max-w-6xl mx-auto py-6 px-4 space-y-6">
       {/* Breadcrumbs & Navigation */}
-      <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
+      <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-slate-500 dark:text-slate-400">
         <div className="flex items-center gap-2">
           <Link to="/harvests" className="hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center gap-1 transition-colors">
             <ArrowLeft className="w-3.5 h-3.5" />
@@ -251,7 +253,7 @@ export const HarvestDetailView: React.FC = () => {
         <div className="flex items-center gap-2">
           <button
             onClick={handleCopyJSON}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-semibold transition-all cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-sm font-semibold transition-all cursor-pointer"
             title="Copy Raw Harvest Data"
           >
             {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
@@ -260,7 +262,7 @@ export const HarvestDetailView: React.FC = () => {
 
           <button
             onClick={handleDownloadJSON}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-semibold transition-all cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-sm font-semibold transition-all cursor-pointer"
             title="Download JSON File"
           >
             <Download className="w-3.5 h-3.5" />
@@ -280,7 +282,7 @@ export const HarvestDetailView: React.FC = () => {
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-2">
               <Tooltip content="Schema Format: Defines the structural specification and serialization rules used for this harvest.">
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-semibold bg-indigo-50 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60 cursor-help">
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-semibold bg-indigo-50 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-600 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60 cursor-help">
                   <Sparkles className="w-3 h-3 text-indigo-500" />
                   {meta.format || 'docklang/v0.3'}
                 </span>
@@ -312,21 +314,16 @@ export const HarvestDetailView: React.FC = () => {
               {title}
             </h1>
 
-            <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+            <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
               <Tooltip content="Unique Harvest Identifier: Canonical database token generated at ingestion time.">
                 <span>
-                  Harvest ID: <span className="font-mono text-slate-700 dark:text-slate-300 underline decoration-dotted underline-offset-2 cursor-help">{harvest.id}</span>
+                  Harvest ID: <Link to={`/harvests/${harvest.id}`} className="font-mono text-indigo-600 dark:text-indigo-400 underline decoration-dotted underline-offset-2 hover:decoration-solid">{harvest.id}</Link>
                 </span>
               </Tooltip>
               <span>•</span>
               <Tooltip content="Ingestion Date: The timestamp when this harvest was processed into the system repository.">
                 <span className="cursor-help">
-                  Created:{' '}
-                  {new Date(harvest.createdAt).toLocaleDateString(undefined, {
-                    year: 'numeric',
-                    month: 'short',
-                    day: 'numeric',
-                  })}
+                  Created: {formatDateTime(harvest.createdAt)}
                 </span>
               </Tooltip>
             </div>
@@ -335,7 +332,7 @@ export const HarvestDetailView: React.FC = () => {
           <div className="flex items-center gap-3 self-start">
             {Object.values(flaggedItems).filter(Boolean).length > 0 && (
               <Tooltip content="Flagged Review Items: Total discourse units or blocks flagged for manual review or auditing.">
-                <span className="inline-flex items-center gap-1.5 px-3 py-2 bg-amber-50 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-800 text-xs font-semibold rounded-xl shadow-xs cursor-help">
+                <span className="inline-flex items-center gap-1.5 px-3 py-2 bg-amber-50 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-800 text-sm font-semibold rounded-xl shadow-xs cursor-help">
                   <Flag className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
                   <span>{Object.values(flaggedItems).filter(Boolean).length} Flagged</span>
                 </span>
@@ -345,7 +342,7 @@ export const HarvestDetailView: React.FC = () => {
             <Tooltip content="Extracted Candidates: View work candidates and actionable tasks derived from this harvest document.">
               <Link
                 to="/candidates"
-                className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl shadow-xs transition-all cursor-pointer"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-xl shadow-xs transition-all cursor-pointer"
               >
                 <Database className="w-4 h-4" />
                 <span>{harvest.totalCandidates || 0} Candidates</span>
@@ -355,7 +352,7 @@ export const HarvestDetailView: React.FC = () => {
         </div>
 
         {/* Provenance Details */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 dark:bg-slate-950/60 p-4 rounded-xl border border-slate-200/80 dark:border-slate-800/80 text-xs font-mono">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 dark:bg-slate-950/60 p-4 rounded-xl border border-slate-200/80 dark:border-slate-800/80 text-sm font-mono">
           <div className="space-y-1">
             <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 font-semibold uppercase text-[10px] tracking-wider">
               <Folder className="w-3.5 h-3.5 text-indigo-500" />
@@ -385,7 +382,7 @@ export const HarvestDetailView: React.FC = () => {
 
         {/* Stats Chips & Unit Metrics Breakdown */}
         <div className="space-y-2">
-          <div className="flex items-center justify-between text-xs font-semibold text-slate-700 dark:text-slate-300 font-mono">
+          <div className="flex items-center justify-between text-sm font-semibold text-slate-700 dark:text-slate-300 font-mono">
             <div className="flex items-center gap-1.5">
               <span>Discourse Metrics & Block Breakdown</span>
               <Tooltip content="Discourse Block Breakdown: Quantitative summary of conversation turns and extracted semantic blocks.">
@@ -475,7 +472,7 @@ export const HarvestDetailView: React.FC = () => {
         <div className="inline-flex items-center p-1 bg-slate-100 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800">
           <button
             onClick={() => setViewMode('markdown')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all cursor-pointer ${
               viewMode === 'markdown'
                 ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-xs'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -487,7 +484,7 @@ export const HarvestDetailView: React.FC = () => {
 
           <button
             onClick={() => setViewMode('raw')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all cursor-pointer ${
               viewMode === 'raw'
                 ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-xs'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -509,12 +506,12 @@ export const HarvestDetailView: React.FC = () => {
                 placeholder="Search discourse..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-8 pr-3 py-1.5 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 rounded-xl text-xs focus:outline-none focus:border-indigo-500 transition-all font-mono"
+                className="w-full pl-8 pr-3 py-1.5 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 rounded-xl text-sm focus:outline-none focus:border-indigo-500 transition-all font-mono"
               />
             </div>
 
             {/* Role Filter */}
-            <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-950 p-1 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-mono">
+            <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-950 p-1 rounded-xl border border-slate-200 dark:border-slate-800 text-sm font-mono">
               <button
                 onClick={() => setRoleFilter('all')}
                 className={`px-2.5 py-1 rounded-lg transition-all ${
@@ -541,7 +538,7 @@ export const HarvestDetailView: React.FC = () => {
                 onClick={() => setRoleFilter('user')}
                 className={`px-2.5 py-1 rounded-lg transition-all ${
                   roleFilter === 'user'
-                    ? 'bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 font-bold shadow-xs'
+                    ? 'bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-600 dark:text-emerald-400 font-bold shadow-xs'
                     : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
                 }`}
               >
@@ -559,8 +556,8 @@ export const HarvestDetailView: React.FC = () => {
             /* Fallback if sourceText markdown */
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 space-y-4 shadow-sm">
               <h3 className="text-sm font-bold text-slate-900 dark:text-white font-mono">Document Text Rendition</h3>
-              <div className="bg-slate-50 dark:bg-slate-950 p-6 rounded-xl border border-slate-200 dark:border-slate-800 font-mono text-xs text-slate-800 dark:text-slate-200 whitespace-pre-line leading-relaxed">
-                {harvest.sourceText}
+              <div className="bg-slate-50 dark:bg-slate-950 p-6 rounded-xl border border-slate-200 dark:border-slate-800 leading-relaxed">
+                <MarkdownRenderer content={harvest.sourceText || ''} />
               </div>
             </div>
           ) : (
@@ -602,12 +599,12 @@ export const HarvestDetailView: React.FC = () => {
                   >
                     <div className="flex items-center gap-3">
                       <div
-                        className={`w-9 h-9 rounded-xl flex items-center justify-center font-semibold text-xs border ${
+                        className={`w-9 h-9 rounded-xl flex items-center justify-center font-semibold text-sm border ${
                           isTurnFlagged
                             ? 'bg-amber-100 dark:bg-amber-950 text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-800'
                             : isAssistant
                             ? 'bg-indigo-50 dark:bg-indigo-950/80 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800/50'
-                            : 'bg-emerald-50 dark:bg-emerald-950/80 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/50'
+                            : 'bg-emerald-50 dark:bg-emerald-950/80 text-emerald-600 dark:text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/50'
                         }`}
                       >
                         {isAssistant ? <Bot className="w-5 h-5" /> : <User className="w-5 h-5" />}
@@ -622,7 +619,7 @@ export const HarvestDetailView: React.FC = () => {
                           <span
                             className={`text-[10px] font-mono uppercase font-bold px-2 py-0.5 rounded-full ${
                               isAssistant
-                                ? 'bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300'
+                                ? 'bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-600 dark:text-indigo-300'
                                 : 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
                             }`}
                           >
@@ -646,7 +643,7 @@ export const HarvestDetailView: React.FC = () => {
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => copyTurnContent(turnBody, turnTitle)}
-                        className="p-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-lg text-xs transition-all cursor-pointer"
+                        className="p-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-lg text-sm transition-all cursor-pointer"
                         title="Copy Turn Content"
                       >
                         <Copy className="w-3.5 h-3.5" />
@@ -670,7 +667,7 @@ export const HarvestDetailView: React.FC = () => {
 
                       <button
                         onClick={() => toggleTurnCollapse(idx)}
-                        className="p-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-lg text-xs transition-all cursor-pointer"
+                        className="p-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-lg text-sm transition-all cursor-pointer"
                         title={isCollapsed ? 'Expand Turn' : 'Collapse Turn'}
                       >
                         {isCollapsed ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
@@ -783,7 +780,7 @@ export const HarvestDetailView: React.FC = () => {
                                 className={blockWrapperClass}
                               >
                                 {renderBlockHeader()}
-                                <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 font-mono text-xs text-emerald-400 overflow-x-auto shadow-inner leading-relaxed">
+                                <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 font-mono text-sm text-emerald-600 dark:text-emerald-400 overflow-x-auto shadow-inner leading-relaxed">
                                   <pre>{block.content}</pre>
                                 </div>
                               </div>
@@ -830,8 +827,8 @@ export const HarvestDetailView: React.FC = () => {
                           );
                         })
                       ) : (
-                        <div className="whitespace-pre-line leading-relaxed text-sm text-slate-800 dark:text-slate-200">
-                          {unit.body}
+                        <div className="leading-relaxed text-sm text-slate-800 dark:text-slate-200">
+                          <MarkdownRenderer content={unit.body || ''} />
                         </div>
                       )}
                     </div>
@@ -844,7 +841,7 @@ export const HarvestDetailView: React.FC = () => {
       ) : (
         /* Raw Data (JSON) View */
         <div className="bg-slate-950 border border-slate-800 rounded-2xl p-6 space-y-4 shadow-xl">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-3 text-xs font-mono">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3 text-sm font-mono">
             <span className="text-indigo-400 font-bold uppercase tracking-wider flex items-center gap-2">
               <FileCode className="w-4 h-4 text-indigo-400" />
               Docklang Canonical JSON Structure
@@ -855,7 +852,7 @@ export const HarvestDetailView: React.FC = () => {
             </span>
           </div>
 
-          <div className="p-4 bg-slate-900/80 rounded-xl font-mono text-xs text-indigo-300 overflow-x-auto max-h-[700px] border border-slate-800/80 shadow-inner leading-relaxed">
+          <div className="p-4 bg-slate-900/80 rounded-xl font-mono text-sm text-indigo-600 dark:text-indigo-300 overflow-x-auto max-h-[700px] border border-slate-800/80 shadow-inner leading-relaxed">
             <pre>{harvest.docklang ? JSON.stringify(harvest.docklang, null, 2) : JSON.stringify(harvest, null, 2)}</pre>
           </div>
         </div>

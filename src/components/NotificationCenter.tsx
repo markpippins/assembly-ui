@@ -165,7 +165,7 @@ export const NotificationCenter: React.FC = () => {
           {/* Header */}
           <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/50">
             <div className="flex items-center gap-2">
-              <h3 className="text-xs font-bold text-slate-900 dark:text-white font-poppins">Notifications</h3>
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white font-poppins">Notifications</h3>
               {unreadCount > 0 && (
                 <span className="px-2 py-0.5 text-[10px] font-mono font-bold rounded-full bg-indigo-50 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30">
                   {unreadCount} new
@@ -188,7 +188,7 @@ export const NotificationCenter: React.FC = () => {
           </div>
 
           {/* Filter Bar */}
-          <div className="px-4 py-2 border-b border-slate-100 dark:border-slate-800/60 flex items-center justify-between text-xs bg-slate-100/40 dark:bg-slate-950/40">
+          <div className="px-4 py-2 border-b border-slate-100 dark:border-slate-800/60 flex items-center justify-between text-sm bg-slate-100/40 dark:bg-slate-950/40">
             <div className="flex items-center gap-1">
               <button
                 onClick={() => setFilter('all')}
@@ -227,7 +227,7 @@ export const NotificationCenter: React.FC = () => {
             {filteredNotifications.length === 0 ? (
               <div className="p-6 text-center text-slate-500 dark:text-slate-400 space-y-2">
                 <Sparkles className="w-6 h-6 mx-auto text-slate-400 dark:text-slate-600" />
-                <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">No notifications to display</p>
+                <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">No notifications to display</p>
                 <p className="text-[11px]">You are all caught up!</p>
               </div>
             ) : (
@@ -235,7 +235,7 @@ export const NotificationCenter: React.FC = () => {
                 <div
                   key={item.id}
                   onClick={() => handleNotificationClick(item)}
-                  className={`group p-3.5 flex items-start gap-3 text-xs cursor-pointer transition-colors ${
+                  className={`group p-3.5 flex items-start gap-3 text-sm cursor-pointer transition-colors ${
                     !item.read
                       ? 'bg-indigo-50/40 dark:bg-indigo-950/20 hover:bg-indigo-50/80 dark:hover:bg-indigo-950/40'
                       : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'

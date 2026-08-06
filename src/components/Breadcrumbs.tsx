@@ -7,6 +7,7 @@ const ROUTE_NAME_MAP: Record<string, string> = {
   'work-requests': 'Work Requests',
   'open-questions': 'Open Questions',
   forums: 'Forums & Discussions',
+  todo: 'To Do',
   requirements: 'Requirements Catalog',
   agendas: 'Agendas & Planning',
   candidates: 'Candidates & Proposals',
@@ -60,7 +61,7 @@ export const Breadcrumbs: React.FC = () => {
   return (
     <nav
       aria-label="Breadcrumb"
-      className="px-6 py-2.5 bg-slate-100/60 dark:bg-slate-900/40 border-b border-slate-200/80 dark:border-slate-800/60 flex items-center text-xs text-slate-500 dark:text-slate-400 font-medium overflow-x-auto whitespace-nowrap"
+      className="px-6 py-2.5 bg-slate-100/60 dark:bg-slate-900/40 border-b border-slate-200/80 dark:border-slate-800/60 flex items-center text-sm text-slate-500 dark:text-slate-400 font-medium overflow-x-auto whitespace-nowrap"
     >
       <ol className="inline-flex items-center space-x-1.5 md:space-x-2">
         <li className="inline-flex items-center">

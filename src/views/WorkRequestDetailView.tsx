@@ -3,8 +3,9 @@ import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Shield, FileText, CheckSquare, Calendar, User } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
 import { StatusBadge } from '../components/StatusBadge';
-import { TTSButton } from '../components/TTSButton';
+import { MarkdownRenderer } from '../components/MarkdownRenderer';
 import { dataService } from '../services/dataService';
+import { formatDateTime } from '../utils/format';
 import { WorkRequest } from '../types';
 
 export const WorkRequestDetailView: React.FC = () => {
@@ -22,7 +23,7 @@ export const WorkRequestDetailView: React.FC = () => {
     return (
       <div className="max-w-4xl mx-auto py-8 text-center text-slate-400">
         <p>Work Request not found</p>
-        <Link to="/work-requests" className="text-xs text-indigo-400 hover:underline mt-2 inline-block">
+        <Link to="/work-requests" className="text-sm text-indigo-400 hover:underline mt-2 inline-block">
           Return to Work Requests
         </Link>
       </div>
@@ -31,58 +32,56 @@ export const WorkRequestDetailView: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto py-6 px-4 space-y-6">
-      <div className="flex items-center gap-2 text-xs text-slate-400">
+      <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
         <Link to="/work-requests" className="hover:text-indigo-400 flex items-center gap-1">
           <ArrowLeft className="w-3.5 h-3.5" />
           <span>Work Requests</span>
         </Link>
         <span>/</span>
-        <span className="text-white font-mono">{wr.id}</span>
+        <Link to={`/work-requests/${wr.id}`} className="text-slate-900 dark:text-white font-mono hover:text-indigo-600 dark:hover:text-indigo-400 hover:underline">{wr.id}</Link>
       </div>
 
       <PageHeader
         title={wr.title}
-        subtitle={`ID: ${wr.id}`}
+        subtitle={<>ID: <Link to={`/work-requests/${wr.id}`} className="text-indigo-600 dark:text-indigo-400 hover:underline font-mono">{wr.id}</Link></>}
         ttsContent={`Work Request ${wr.title}. Status ${wr.status}. Intent: ${wr.intent || 'None'}.`}
         action={<StatusBadge status={wr.status} size="md" />}
       />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="md:col-span-2 space-y-6">
-          <div className="bg-slate-800/80 border border-slate-700/80 rounded-xl p-5 space-y-3 shadow-sm">
-            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider font-mono">Description</h3>
-            <p className="text-xs text-slate-200 leading-relaxed whitespace-pre-line">
-              {wr.description || 'No detailed description provided.'}
-            </p>
+          <div className="app-panel p-4 space-y-3">
+            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider font-mono">Description</h3>
+            <MarkdownRenderer content={wr.description || 'No detailed description provided.'} />
           </div>
 
-          <div className="bg-slate-800/80 border border-slate-700/80 rounded-xl p-5 space-y-3 shadow-sm">
-            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider font-mono">Context & Constraints</h3>
-            <div className="bg-slate-900 p-4 rounded-lg font-mono text-xs text-indigo-300 overflow-x-auto border border-slate-700/60">
+          <div className="app-panel p-4 space-y-3">
+            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider font-mono">Context & Constraints</h3>
+            <div className="bg-slate-900 p-4 rounded-lg font-mono text-sm text-indigo-600 dark:text-indigo-300 overflow-x-auto border border-slate-700/60">
               <pre>{JSON.stringify({ context: wr.context, constraints: wr.constraints }, null, 2)}</pre>
             </div>
           </div>
         </div>
 
         <div className="space-y-4">
-          <div className="bg-slate-800/80 border border-slate-700/80 rounded-xl p-5 space-y-4 shadow-sm">
-            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider font-mono border-b border-slate-700 pb-2">
+          <div className="app-panel p-4 space-y-4">
+            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider font-mono border-b border-slate-700 pb-2">
               Metadata
             </h3>
-            <div className="space-y-3 text-xs">
+            <div className="space-y-3 text-sm">
               <div>
                 <span className="text-slate-400 block text-[11px]">Intent</span>
-                <span className="text-white font-medium">{wr.intent || 'N/A'}</span>
+                <MarkdownRenderer content={wr.intent || 'N/A'} />
               </div>
 
               <div>
                 <span className="text-slate-400 block text-[11px]">Created By</span>
-                <span className="text-white font-medium">{wr.createdBy || 'System'}</span>
+                <span className="text-slate-800 dark:text-white font-medium">{wr.createdBy || 'System'}</span>
               </div>
 
               <div>
                 <span className="text-slate-400 block text-[11px]">Created Date</span>
-                <span className="text-slate-200 font-mono text-[11px]">{new Date(wr.createdAt).toLocaleString()}</span>
+                <span className="text-slate-200 font-mono text-[11px]">{formatDateTime(wr.createdAt)}</span>
               </div>
 
               {wr.sourceSpecificationId && (

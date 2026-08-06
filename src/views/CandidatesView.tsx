@@ -4,6 +4,7 @@ import { Users, ChevronRight, Code2, Tag } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
 import { StatusBadge } from '../components/StatusBadge';
 import { dataService } from '../services/dataService';
+import { formatDateTime } from '../utils/format';
 import { Candidate } from '../types';
 
 export const CandidatesView: React.FC = () => {
@@ -25,14 +26,14 @@ export const CandidatesView: React.FC = () => {
         {candidates.map((cand) => (
           <div
             key={cand.id}
-            className="bg-slate-800/60 border border-slate-700/80 rounded-xl p-5 space-y-3 shadow-sm hover:border-slate-600 transition-all"
+            className="app-panel p-4 space-y-3 hover:border-slate-600 transition-all"
           >
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <StatusBadge status={cand.status} />
-                <span className="font-mono text-xs text-slate-400">{cand.id}</span>
+                <RouterLink to={`/candidates/${cand.id}`} className="font-mono text-sm text-indigo-600 dark:text-indigo-400 hover:underline">{cand.id}</RouterLink>
               </div>
-              <div className="flex items-center gap-2 font-mono text-xs text-indigo-300">
+              <div className="flex items-center gap-2 font-mono text-sm text-indigo-600 dark:text-indigo-300">
                 <span>Readiness:</span>
                 <div className="w-24 h-2 bg-slate-900 rounded-full overflow-hidden border border-slate-700">
                   <div
@@ -44,9 +45,9 @@ export const CandidatesView: React.FC = () => {
               </div>
             </div>
 
-            <h2 className="text-base font-bold text-white font-poppins">{cand.title}</h2>
+            <h2 className="text-base font-bold text-slate-900 dark:text-white font-poppins">{cand.title}</h2>
             {cand.intentDescription && (
-              <p className="text-xs text-slate-300 leading-relaxed">{cand.intentDescription}</p>
+              <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">{cand.intentDescription}</p>
             )}
 
             {cand.tags && cand.tags.length > 0 && (
@@ -54,7 +55,7 @@ export const CandidatesView: React.FC = () => {
                 {cand.tags.map((tag) => (
                   <span
                     key={tag}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-900 text-slate-300 text-[10px] font-mono border border-slate-700"
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-300 text-[10px] font-mono border border-slate-200 dark:border-slate-700"
                   >
                     <Tag className="w-2.5 h-2.5 text-indigo-400" />
                     {tag}
@@ -63,9 +64,9 @@ export const CandidatesView: React.FC = () => {
               </div>
             )}
 
-            <div className="pt-3 border-t border-slate-700/50 flex items-center justify-between text-xs">
+            <div className="pt-3 border-t border-slate-200 dark:border-slate-700/50 flex items-center justify-between text-sm">
               <span className="text-slate-400 font-mono text-[11px]">
-                Harvest Source: {cand.harvestSourceFilename || 'N/A'}
+                Harvest Source: {cand.harvestSourceFilename || 'N/A'} · {formatDateTime(cand.createdAt)}
               </span>
               <RouterLink
                 to={`/candidates/${cand.id}`}

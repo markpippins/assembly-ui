@@ -322,6 +322,7 @@ export interface Counts {
   forums: number;
   posts: number;
   threads: number;
+  toDoThreads: number;
   comments: number;
   workRequests: number;
   requirements: number;

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { FileCheck, ChevronRight } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
 import { dataService } from '../services/dataService';
+import { formatDateTime } from '../utils/format';
 import { Specification } from '../types';
 
 export const SpecificationsView: React.FC = () => {
@@ -22,21 +23,24 @@ export const SpecificationsView: React.FC = () => {
 
       <div className="space-y-4">
         {specs.map((spec) => (
-          <div key={spec.id} className="bg-slate-800/60 border border-slate-700/80 rounded-xl p-5 space-y-3 shadow-sm">
+          <div key={spec.id} className="app-panel p-4 space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="font-mono text-xs font-bold uppercase px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">
+                <span className="font-mono text-sm font-bold uppercase px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30">
                   Revision #{spec.revisionNumber} ({spec.revisionType})
                 </span>
               </div>
-              <span className="font-mono text-[11px] text-slate-400">{spec.id}</span>
+              <Link to={`/specifications/${spec.id}`} className="font-mono text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline">{spec.id}</Link>
             </div>
 
-            <h2 className="text-base font-bold text-white font-poppins">Specification for Agenda: {spec.agendaId}</h2>
-            <p className="text-xs text-slate-300">{spec.changeSummary}</p>
+            <h2 className="text-base font-bold text-slate-900 dark:text-white font-poppins">Specification for Agenda: {spec.agendaId}</h2>
+            <p className="text-sm text-slate-700 dark:text-slate-300">{spec.changeSummary}</p>
 
-            <div className="pt-3 border-t border-slate-700/50 flex items-center justify-between text-xs font-mono text-slate-400">
-              <span>Valid From: {new Date(spec.validFrom).toLocaleDateString()}</span>
+            <div className="pt-3 border-t border-slate-200 dark:border-slate-700/50 flex items-center justify-between text-sm font-mono text-slate-500 dark:text-slate-400">
+              <span>
+                <span className="mr-3">Valid From: {formatDateTime(spec.validFrom)}</span>
+                <span>Created: {formatDateTime(spec.createdAt)}</span>
+              </span>
               <Link to={`/specifications/${spec.id}`} className="text-indigo-400 hover:underline flex items-center gap-1">
                 <span>View Snapshot</span>
                 <ChevronRight className="w-3.5 h-3.5" />

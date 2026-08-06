@@ -4,6 +4,7 @@ import { Shield, ChevronRight, Filter } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
 import { StatusBadge } from '../components/StatusBadge';
 import { dataService } from '../services/dataService';
+import { formatDateTime } from '../utils/format';
 import { WorkRequest } from '../types';
 
 export const WorkRequestsView: React.FC = () => {
@@ -31,7 +32,7 @@ export const WorkRequestsView: React.FC = () => {
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1 text-xs text-slate-900 dark:text-slate-200 focus:outline-none focus:border-indigo-500"
+            className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1 text-sm text-slate-900 dark:text-slate-200 focus:outline-none focus:border-indigo-500"
           >
             <option value="ALL">All Statuses</option>
             <option value="ACTIVE">Active</option>
@@ -41,9 +42,9 @@ export const WorkRequestsView: React.FC = () => {
         </div>
       </PageHeader>
 
-      <div className="bg-white dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-xl overflow-hidden shadow-sm">
+      <div className="app-panel overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs">
+          <table className="w-full text-left border-collapse text-sm">
             <thead>
               <tr className="bg-slate-50 dark:bg-slate-900/80 border-b border-slate-200 dark:border-slate-700/80 text-slate-500 dark:text-slate-400 font-mono uppercase text-[10px]">
                 <th className="py-3 px-4 font-semibold">ID / Title</th>
@@ -59,10 +60,10 @@ export const WorkRequestsView: React.FC = () => {
                 <tr key={wr.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
                   <td className="py-3 px-4">
                     <div className="flex flex-col">
-                      <Link to={`/work-requests/${wr.id}`} className="font-bold text-slate-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-300 transition-colors">
+                      <Link to={`/work-requests/${wr.id}`} className="font-bold text-slate-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-600 dark:text-indigo-300 transition-colors">
                         {wr.title}
                       </Link>
-                      <span className="font-mono text-[10px] text-slate-400 dark:text-slate-500">{wr.id}</span>
+                      <Link to={`/work-requests/${wr.id}`} className="font-mono text-[10px] text-indigo-600 dark:text-indigo-400 hover:underline">{wr.id}</Link>
                     </div>
                   </td>
                   <td className="py-3 px-4 text-slate-600 dark:text-slate-300">{wr.intent || '—'}</td>
@@ -71,12 +72,12 @@ export const WorkRequestsView: React.FC = () => {
                   </td>
                   <td className="py-3 px-4 text-slate-700 dark:text-slate-300 font-medium">{wr.createdBy || 'System'}</td>
                   <td className="py-3 px-4 text-slate-500 dark:text-slate-400 font-mono text-[11px]">
-                    {new Date(wr.createdAt).toLocaleDateString()}
+                    {formatDateTime(wr.createdAt)}
                   </td>
                   <td className="py-3 px-4 text-right">
                     <Link
                       to={`/work-requests/${wr.id}`}
-                      className="inline-flex items-center gap-1 text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-semibold"
+                      className="inline-flex items-center gap-1 text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-600 dark:text-indigo-300 font-semibold"
                     >
                       <span>View</span>
                       <ChevronRight className="w-3.5 h-3.5" />

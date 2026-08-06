@@ -3,8 +3,9 @@ import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, CheckCircle2, Clock, Send, ShieldAlert, AlertTriangle } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
 import { StatusBadge } from '../components/StatusBadge';
-import { TTSButton } from '../components/TTSButton';
+import { MarkdownRenderer } from '../components/MarkdownRenderer';
 import { dataService } from '../services/dataService';
+import { formatDateTime } from '../utils/format';
 import { useToast } from '../context/ToastContext';
 import { OpenQuestion, OpenQuestionAnswer, TimelineEvent } from '../types';
 
@@ -54,7 +55,7 @@ export const OpenQuestionDetailView: React.FC = () => {
     return (
       <div className="max-w-4xl mx-auto py-8 text-center text-slate-400">
         <p>Question not found</p>
-        <Link to="/open-questions" className="text-xs text-indigo-400 hover:underline mt-2 inline-block">
+        <Link to="/open-questions" className="text-sm text-indigo-400 hover:underline mt-2 inline-block">
           Return to Open Questions
         </Link>
       </div>
@@ -63,13 +64,13 @@ export const OpenQuestionDetailView: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto py-6 px-4 space-y-6">
-      <div className="flex items-center gap-2 text-xs text-slate-400">
+      <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
         <Link to="/open-questions" className="hover:text-indigo-400 flex items-center gap-1">
           <ArrowLeft className="w-3.5 h-3.5" />
           <span>Open Questions</span>
         </Link>
         <span>/</span>
-        <span className="text-white font-mono">{q.id}</span>
+        <Link to={`/open-questions/${q.id}`} className="text-slate-900 dark:text-white font-mono hover:text-indigo-600 dark:hover:text-indigo-400 hover:underline">{q.id}</Link>
       </div>
 
       <PageHeader
@@ -79,36 +80,34 @@ export const OpenQuestionDetailView: React.FC = () => {
         action={<StatusBadge status={q.status} size="md" />}
       />
 
-      <div className="bg-slate-800/80 border border-slate-700/80 rounded-xl p-6 space-y-4 shadow-sm">
+      <div className="app-panel p-4 space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="font-mono text-xs text-slate-400">{q.id}</span>
+            <Link to={`/open-questions/${q.id}`} className="font-mono text-sm text-indigo-600 dark:text-indigo-400 hover:underline">{q.id}</Link>
             {q.blocking && (
-              <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/40">
+              <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-rose-50 dark:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-500/40">
                 <AlertTriangle className="w-3.5 h-3.5" />
                 BLOCKING
               </span>
             )}
           </div>
-          <span className="text-xs text-slate-400 font-mono">Raised by {q.createdBy || 'Contributor'}</span>
+          <span className="text-sm text-slate-500 dark:text-slate-400 font-mono">Raised by {q.createdBy || 'Contributor'}</span>
         </div>
 
-        <p className="text-xs text-slate-200 leading-relaxed whitespace-pre-line bg-slate-900/40 p-4 rounded-lg border border-slate-700/50">
-          {q.description || 'No additional description.'}
-        </p>
+        <MarkdownRenderer content={q.description || 'No additional description.'} />
       </div>
 
       {/* Answer Submission Form */}
-      <form onSubmit={handleAddAnswer} className="bg-slate-800/60 border border-slate-700/70 rounded-xl p-5 space-y-4 shadow-sm">
-        <h3 className="text-xs font-bold text-white uppercase tracking-wider font-mono">Provide Answer / Resolution</h3>
+      <form onSubmit={handleAddAnswer} className="app-panel p-4 space-y-4">
+        <h3 className="text-sm font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider font-mono">Provide Answer / Resolution</h3>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1">Responding Role</label>
+            <label className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Responding Role</label>
             <select
               value={role}
               onChange={(e) => setRole(e.target.value)}
-              className="w-full h-9 px-3 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-indigo-500"
+              className="w-full h-9 px-3 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100 focus:outline-none focus:border-indigo-500"
             >
               <option value="Architect">Architect</option>
               <option value="Lead Engineer">Lead Engineer</option>
@@ -118,11 +117,11 @@ export const OpenQuestionDetailView: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1">Confidence</label>
+            <label className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Confidence</label>
             <select
               value={confidence}
               onChange={(e) => setConfidence(e.target.value)}
-              className="w-full h-9 px-3 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-indigo-500"
+              className="w-full h-9 px-3 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100 focus:outline-none focus:border-indigo-500"
             >
               <option value="HIGH">High (Definitive)</option>
               <option value="MEDIUM">Medium (Provisional)</option>
@@ -132,25 +131,25 @@ export const OpenQuestionDetailView: React.FC = () => {
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-slate-300 mb-1">Answer Decision</label>
+          <label className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Answer Decision</label>
           <textarea
             required
             rows={3}
             value={answerText}
             onChange={(e) => setAnswerText(e.target.value)}
             placeholder="State the decision or answer cleanly..."
-            className="w-full p-3 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-100 placeholder-slate-400 focus:outline-none focus:border-indigo-500 resize-none"
+            className="w-full p-3 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-400 focus:outline-none focus:border-indigo-500 resize-none"
           />
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-slate-300 mb-1">Supporting Reasoning (Optional)</label>
+          <label className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Supporting Reasoning (Optional)</label>
           <input
             type="text"
             value={reasoning}
             onChange={(e) => setReasoning(e.target.value)}
             placeholder="Trade-offs, performance impact, or specs reference..."
-            className="w-full h-9 px-3 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-100 placeholder-slate-400 focus:outline-none focus:border-indigo-500"
+            className="w-full h-9 px-3 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-400 focus:outline-none focus:border-indigo-500"
           />
         </div>
 
@@ -158,7 +157,7 @@ export const OpenQuestionDetailView: React.FC = () => {
           <button
             type="submit"
             disabled={!answerText.trim()}
-            className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-semibold rounded-lg shadow-sm"
+            className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-sm font-semibold rounded-lg shadow-sm"
           >
             <Send className="w-3.5 h-3.5" />
             <span>Record Answer</span>
@@ -168,23 +167,23 @@ export const OpenQuestionDetailView: React.FC = () => {
 
       {/* Existing Answers */}
       <div className="space-y-4">
-        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider font-mono">Answers ({answers.length})</h3>
+        <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider font-mono">Answers ({answers.length})</h3>
         {answers.map((ans) => (
-          <div key={ans.id} className="bg-slate-800/40 border border-slate-700/60 rounded-xl p-4 space-y-2">
+          <div key={ans.id} className="app-panel p-4 space-y-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-emerald-400">{ans.role}</span>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-700">
+                <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">{ans.role}</span>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
                   Confidence: {ans.confidence}
                 </span>
               </div>
               <span className="text-[11px] text-slate-400 font-mono">
-                {new Date(ans.answeredAt).toLocaleString()}
+                {formatDateTime(ans.answeredAt)}
               </span>
             </div>
-            <p className="text-xs text-slate-100 leading-relaxed whitespace-pre-line">{ans.answer}</p>
+            <MarkdownRenderer content={ans.answer} />
             {ans.reasoning && (
-              <p className="text-xs text-slate-400 italic bg-slate-900/60 p-2.5 rounded-lg border border-slate-800">
+              <p className="text-sm text-slate-500 dark:text-slate-400 italic bg-slate-900/60 p-2.5 rounded-lg border border-slate-800">
                 Reasoning: {ans.reasoning}
               </p>
             )}
@@ -193,15 +192,15 @@ export const OpenQuestionDetailView: React.FC = () => {
       </div>
 
       {/* Audit Timeline */}
-      <div className="bg-slate-800/30 border border-slate-800 rounded-xl p-5 space-y-3">
-        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider font-mono">Event Timeline</h3>
+      <div className="app-panel p-4 space-y-3">
+        <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider font-mono">Event Timeline</h3>
         <div className="space-y-3 pl-2 border-l border-slate-700">
           {timeline.map((evt, idx) => (
             <div key={idx} className="relative pl-4">
               <div className="absolute -left-1.5 top-1 w-3 h-3 rounded-full bg-indigo-500 border border-slate-900" />
-              <div className="text-xs font-bold text-white">{evt.label}</div>
+              <div className="text-sm font-bold text-slate-800 dark:text-white">{evt.label}</div>
               <p className="text-[11px] text-slate-400">{evt.description}</p>
-              <p className="text-[10px] font-mono text-slate-500">{new Date(evt.timestamp).toLocaleString()}</p>
+              <p className="text-[10px] font-mono text-slate-500">{formatDateTime(evt.timestamp)}</p>
             </div>
           ))}
         </div>

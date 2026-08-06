@@ -22,7 +22,7 @@ export const TTSButton: React.FC<TTSButtonProps> = ({ text, label = 'Read Aloud'
           speak(text);
         }
       }}
-      className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-lg border transition-all ${
+      className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-sm font-medium rounded-lg border transition-all ${
         currentIsThis
           ? 'bg-indigo-600 text-white border-indigo-500 animate-pulse'
           : 'bg-slate-800/80 text-slate-300 border-slate-700 hover:bg-slate-700 hover:text-white'

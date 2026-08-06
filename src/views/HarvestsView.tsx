@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Sprout, Edit3, Save, ChevronRight, FileCode } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
 import { dataService } from '../services/dataService';
+import { formatDateTime } from '../utils/format';
 import { useToast } from '../context/ToastContext';
 import { Harvest } from '../types';
 
@@ -42,18 +43,19 @@ export const HarvestsView: React.FC = () => {
 
       <div className="space-y-4">
         {harvests.map((h) => (
-          <div key={h.id} className="bg-slate-800/60 border border-slate-700/80 rounded-xl p-5 space-y-3 shadow-sm">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-700/50 pb-3">
+          <div key={h.id} className="app-panel p-4 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-700/50 pb-3">
               <div className="flex items-center gap-3">
-                <FileCode className="w-5 h-5 text-emerald-400" />
+                <FileCode className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
                 <div>
-                  <h2 className="text-sm font-bold text-white font-mono">{h.sourceFilename || h.id}</h2>
+                  <h2 className="text-sm font-bold text-slate-900 dark:text-white font-mono"><Link to={`/harvests/${h.id}`} className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">{h.sourceFilename || h.id}</Link></h2>
                   <p className="text-[11px] text-slate-400 font-mono">Model: {h.model || 'Unknown'}</p>
                 </div>
               </div>
-              <div className="flex items-center gap-3 text-xs font-mono text-slate-400">
+              <div className="flex items-center gap-3 text-sm font-mono text-slate-500 dark:text-slate-400">
                 <span>{h.totalCandidates || 0} candidates</span>
                 <span>{h.fileSize || 0} bytes</span>
+                <span>{formatDateTime(h.createdAt)}</span>
               </div>
             </div>
 
@@ -63,18 +65,18 @@ export const HarvestsView: React.FC = () => {
                   rows={5}
                   value={editText}
                   onChange={(e) => setEditText(e.target.value)}
-                  className="w-full bg-slate-900 font-mono text-xs p-3 text-indigo-300 border border-slate-700 rounded-lg focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-slate-900 font-mono text-sm p-3 text-indigo-600 dark:text-indigo-300 border border-slate-700 rounded-lg focus:outline-none focus:border-indigo-500"
                 />
                 <div className="flex justify-end gap-2">
                   <button
                     onClick={() => setEditingId(null)}
-                    className="px-3 py-1 text-xs text-slate-400 hover:text-white"
+                    className="px-3 py-1 text-sm text-slate-500 dark:text-slate-400 hover:text-white"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={() => handleSaveEdit(h.id)}
-                    className="inline-flex items-center gap-1 px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium rounded-lg shadow-sm"
+                    className="inline-flex items-center gap-1 px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg shadow-sm"
                   >
                     <Save className="w-3.5 h-3.5" />
                     <span>Save Text</span>
@@ -82,7 +84,7 @@ export const HarvestsView: React.FC = () => {
                 </div>
               </div>
             ) : (
-              <div className="relative group bg-slate-900/50 p-3 rounded-lg border border-slate-700/50 font-mono text-xs text-slate-300 whitespace-pre-line">
+              <div className="relative group bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-slate-200 dark:border-slate-700/50 font-mono text-sm text-slate-700 dark:text-slate-300 whitespace-pre-line">
                 {h.sourceText}
                 <button
                   onClick={() => handleStartEdit(h)}
@@ -97,7 +99,7 @@ export const HarvestsView: React.FC = () => {
             <div className="pt-2 flex justify-end">
               <Link
                 to={`/harvests/${h.id}`}
-                className="inline-flex items-center gap-1 text-indigo-400 hover:underline text-xs font-medium"
+                className="inline-flex items-center gap-1 text-indigo-400 hover:underline text-sm font-medium"
               >
                 <span>Full Harvest Details</span>
                 <ChevronRight className="w-3.5 h-3.5" />

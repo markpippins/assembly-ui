@@ -4,6 +4,7 @@ import { Calendar, ChevronRight, BarChart } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
 import { StatusBadge } from '../components/StatusBadge';
 import { dataService } from '../services/dataService';
+import { formatDateTime } from '../utils/format';
 import { Agenda } from '../types';
 
 export const AgendasView: React.FC = () => {
@@ -25,26 +26,30 @@ export const AgendasView: React.FC = () => {
         {agendas.map((agenda) => (
           <div
             key={agenda.id}
-            className="bg-slate-800/60 border border-slate-700/80 rounded-xl p-5 space-y-4 shadow-sm flex flex-col justify-between"
+            className="app-panel p-4 space-y-4 flex flex-col justify-between"
           >
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <StatusBadge status={agenda.status} />
-                <span className="font-mono text-[10px] text-slate-400">{agenda.id}</span>
+                <Link to={`/agendas/${agenda.id}`} className="font-mono text-[10px] text-indigo-600 dark:text-indigo-400 hover:underline">{agenda.id}</Link>
               </div>
-              <h2 className="text-base font-bold text-white font-poppins">{agenda.title}</h2>
-              <p className="text-xs text-slate-300 font-medium">Scope: {agenda.scope || 'General'}</p>
+              <h2 className="text-base font-bold text-slate-900 dark:text-white font-poppins">{agenda.title}</h2>
+              <p className="text-sm text-slate-700 dark:text-slate-300 font-medium">Scope: {agenda.scope || 'General'}</p>
               {agenda.plannerAnalysis && (
-                <p className="text-xs text-slate-400 line-clamp-3 bg-slate-900/50 p-3 rounded-lg border border-slate-700/50">
+                <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-3 bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-slate-200 dark:border-slate-700/50">
                   {agenda.plannerAnalysis}
                 </p>
               )}
             </div>
 
-            <div className="pt-3 border-t border-slate-700/50 flex items-center justify-between text-xs">
-              <div className="flex items-center gap-2 font-mono text-indigo-300">
-                <BarChart className="w-3.5 h-3.5" />
-                <span>Cohesion: {agenda.cohesionScore ? `${(agenda.cohesionScore * 100).toFixed(0)}%` : 'N/A'}</span>
+            <div className="pt-3 border-t border-slate-200 dark:border-slate-700/50 flex items-center justify-between text-sm">
+              <div className="flex items-center gap-3 font-mono text-slate-500 dark:text-slate-400">
+                <span className="flex items-center gap-1.5">
+                  <BarChart className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" />
+                  Cohesion: {agenda.cohesionScore ? `${(agenda.cohesionScore * 100).toFixed(0)}%` : 'N/A'}
+                </span>
+                <span>{agenda.sourceCount ?? 0} sources</span>
+                <span>{formatDateTime(agenda.createdAt)}</span>
               </div>
               <Link
                 to={`/agendas/${agenda.id}`}

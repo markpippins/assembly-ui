@@ -4,7 +4,9 @@ import { Link } from 'react-router-dom';
 import { PageHeader } from '../components/PageHeader';
 import { Avatar } from '../components/Avatar';
 import { TTSButton } from '../components/TTSButton';
+import { MarkdownRenderer } from '../components/MarkdownRenderer';
 import { dataService } from '../services/dataService';
+import { formatDateTime } from '../utils/format';
 import { useToast } from '../context/ToastContext';
 import { FeedPost } from '../types';
 
@@ -45,7 +47,7 @@ export const FeedView: React.FC = () => {
       />
 
       {/* Create Post Input Box */}
-      <form onSubmit={handleCreatePost} className="bg-white dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-xl p-5 space-y-3 shadow-sm">
+      <form onSubmit={handleCreatePost} className="app-panel p-4 space-y-3">
         <div className="flex items-start gap-3">
           <Avatar name="You (Mock)" avatar="Y" size="md" />
           <textarea
@@ -53,7 +55,7 @@ export const FeedView: React.FC = () => {
             onChange={(e) => setNewPostText(e.target.value)}
             placeholder="Share an operational update, observation, or question with the team..."
             rows={3}
-            className="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 resize-none transition-all"
+            className="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 resize-none transition-all"
           />
         </div>
         <div className="flex justify-between items-center pt-2 border-t border-slate-100 dark:border-slate-700/50">
@@ -61,7 +63,7 @@ export const FeedView: React.FC = () => {
           <button
             type="submit"
             disabled={!newPostText.trim()}
-            className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-semibold rounded-lg shadow-sm transition-all"
+            className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg shadow-sm transition-all"
           >
             <Send className="w-3.5 h-3.5" />
             <span>Publish Post</span>
@@ -72,23 +74,23 @@ export const FeedView: React.FC = () => {
       {/* Feed List */}
       <div className="space-y-4">
         {posts.length === 0 ? (
-          <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-xl p-8 text-center text-slate-500 dark:text-slate-400 space-y-2 shadow-sm">
+          <div              className="app-panel p-8 text-center text-slate-500 dark:text-slate-400 space-y-2">
             <Rss className="w-8 h-8 mx-auto text-slate-400 dark:text-slate-500" />
             <p className="text-sm font-semibold text-slate-900 dark:text-white">No activity posts yet</p>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Be the first to share an update using the form above.</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Be the first to share an update using the form above.</p>
           </div>
         ) : (
           posts.map((post) => (
             <div
               key={post.id}
-              className="bg-white dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/70 rounded-xl p-5 space-y-3 hover:border-slate-300 dark:hover:border-slate-600 transition-all shadow-sm"
+              className="app-panel p-4 space-y-3 hover:shadow-soft transition-all duration-150"
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="flex items-center gap-3">
                   <Avatar name={post.author.name} avatar={post.author.avatar} size="md" />
                   <div>
                     <h3 className="text-sm font-semibold text-slate-900 dark:text-white">{post.author.name}</h3>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400">{new Date(post.createdAt).toLocaleString()}</p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">{formatDateTime(post.createdAt)}</p>
                   </div>
                 </div>
 
@@ -106,11 +108,13 @@ export const FeedView: React.FC = () => {
 
               <div>
                 <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 font-poppins">{post.title}</h2>
-                <p className="text-xs text-slate-600 dark:text-slate-300 mt-1.5 whitespace-pre-line leading-relaxed">{post.content}</p>
+                <div className="mt-1.5 line-clamp-3">
+                  <MarkdownRenderer content={post.content} />
+                </div>
               </div>
 
               {post.forum && (
-                <div className="pt-3 border-t border-slate-100 dark:border-slate-700/50 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+                <div className="pt-3 border-t border-slate-100 dark:border-slate-700/50 flex items-center justify-between text-sm text-slate-500 dark:text-slate-400">
                   <Link
                     to={`/forums/${post.forum.slug}`}
                     className="inline-flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400 font-medium hover:underline"

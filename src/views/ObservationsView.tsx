@@ -3,7 +3,20 @@ import { Link } from 'react-router-dom';
 import { Eye, ChevronRight, Check } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
 import { dataService } from '../services/dataService';
+import { formatDateTime } from '../utils/format';
 import { Observation } from '../types';
+
+/** Compact single-line payload summary (mirrors Angular payloadSummary). */
+function payloadSummary(payload: Record<string, unknown> | null): string {
+  if (!payload) return '—';
+  try {
+    const str = typeof payload === 'string' ? payload : JSON.stringify(payload);
+    if (str.length > 120) return str.slice(0, 120) + '...';
+    return str;
+  } catch {
+    return '—';
+  }
+}
 
 export const ObservationsView: React.FC = () => {
   const [observations, setObservations] = useState<Observation[]>([]);
@@ -22,27 +35,31 @@ export const ObservationsView: React.FC = () => {
 
       <div className="space-y-4">
         {observations.map((obs) => (
-          <div key={obs.id} className="bg-slate-800/60 border border-slate-700/80 rounded-xl p-5 space-y-3 shadow-sm">
+          <div key={obs.id} className="app-panel p-4 space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="font-mono text-xs font-bold uppercase px-2 py-0.5 rounded bg-sky-500/10 text-sky-300 border border-sky-500/30">
+                <span className="font-mono text-sm font-bold uppercase px-2 py-0.5 rounded bg-sky-500/10 text-sky-600 dark:text-sky-300 border border-sky-500/30">
                   {obs.triggerType}
                 </span>
                 {obs.assessed && (
-                  <span className="inline-flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                  <span className="inline-flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
                     <Check className="w-3 h-3" /> Assessed
                   </span>
                 )}
               </div>
-              <span className="font-mono text-[11px] text-slate-400">{obs.id}</span>
+              <Link to={`/observations/${obs.id}`} className="font-mono text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline">{obs.id}</Link>
             </div>
 
-            <div className="bg-slate-900 p-3 rounded-lg font-mono text-xs text-indigo-300 overflow-x-auto border border-slate-700/60">
-              <pre>{JSON.stringify(obs.payload, null, 2)}</pre>
-            </div>
+            <p className="bg-slate-50 dark:bg-slate-900/60 px-3 py-2 rounded-lg font-mono text-xs text-slate-600 dark:text-slate-300 overflow-x-auto border border-slate-200 dark:border-slate-700/60 whitespace-pre-wrap break-words">
+              {payloadSummary(obs.payload)}
+            </p>
 
-            <div className="pt-2 flex justify-between items-center text-xs font-mono text-slate-400">
-              <span>Artifact: {obs.sourceArtifactId || 'N/A'}</span>
+            <div className="pt-2 flex justify-between items-center text-sm font-mono text-slate-500 dark:text-slate-400">
+              <span>
+                <span className="mr-3">Artifact: {obs.sourceArtifactId || 'N/A'}</span>
+                <span className="mr-3">Type: {obs.sourceArtifactType || '—'}</span>
+                <span>{formatDateTime(obs.createdAt)}</span>
+              </span>
               <Link to={`/observations/${obs.id}`} className="text-indigo-400 hover:underline flex items-center gap-1">
                 <span>Inspect</span>
                 <ChevronRight className="w-3.5 h-3.5" />

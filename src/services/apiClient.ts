@@ -50,7 +50,20 @@ async function listAll<T>(path: string, params?: Record<string, string>, base: s
     if (env.items.length < pageSize || all.length >= env.total) break;
     page++;
   }
-  return all;
+  // Deduplicate by id — the backend can return overlapping rows across
+  // pages (unstable ordering while rows are inserted) and rows with null
+  // ids; duplicate React keys break list rendering, so collapse them here.
+  const seen = new Set<string>();
+  return all.filter((item: any) => {
+    const key = item?.id != null ? String(item.id) : '';
+    if (key === '') {
+      // Keep null-id rows (they still render with a fallback key in views)
+      return true;
+    }
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 // ── Forums ───────────────────────────────────────────────────────────
@@ -122,7 +135,6 @@ const COLLECTIONS = [
   'agendas',
   'candidates',
   'harvests',
-  'conversations',
   'intents',
   'assessments',
   'observations',
@@ -157,6 +169,13 @@ export async function updateHarvest(id: string, data: { sourceText: string }) {
 // ── Open Questions ──────────────────────────────────────────────────
 export async function fetchOpenQuestions(params?: Record<string, string>) {
   return listAll('/open-questions', params);
+}
+
+// Resolved questions come from the backend's `resolved=true` filter (mirrors
+// Angular's getResolvedQuestions). The unfiltered list returns answered rows
+// with status 'OPEN' — resolving via status client-side misses them.
+export async function fetchResolvedQuestions(): Promise<any[]> {
+  return listAll('/open-questions', { resolved: 'true' });
 }
 
 export async function fetchOpenQuestion(id: string) {
@@ -218,7 +237,27 @@ export async function fetchSpecItem(id: string) {
   return request<any>(new URL(`/nebula/specs/${id}`, window.location.origin).toString());
 }
 
-// ── Conversation blocks (nebula) ────────────────────────────────────
+// ── Conversations (nebula) ───────────────────────────────────────────
+// Conversation snapshots/blocks are nebula-schema tables owned by nebula-srv.
+// Reads go straight to nebula-srv through the /nebula proxy (which rewrites
+// /nebula → /api on :3101), mirroring the Angular data.service migration —
+// see Assembly Issues thread 81eadf40 for the boundary decision.
+
+export async function fetchConversations(): Promise<any[]> {
+  return listAll('/conversations', undefined, '/nebula');
+}
+
+export async function fetchConversation(id: string): Promise<any | null> {
+  try {
+    return await request(
+      new URL(`/nebula/conversations/by-snapshot/${id}`, window.location.origin).toString()
+    );
+  } catch (e: any) {
+    if (e.message?.includes('404')) return null;
+    throw e;
+  }
+}
+
 export async function fetchConversationBlocks(snapshotId: string): Promise<any[]> {
   try {
     const result = await request<{ blocks: any[] }>(
@@ -256,6 +295,7 @@ export async function loadAllData(): Promise<Record<string, any>> {
     harvests,
     conversations,
     openQuestions,
+    resolvedOpenQuestions,
     intents,
     assessments,
     observations,
@@ -273,8 +313,9 @@ export async function loadAllData(): Promise<Record<string, any>> {
     safe(fetchCollection('agendas'), 'agendas'),
     safe(fetchCollection('candidates'), 'candidates'),
     safe(fetchCollection('harvests'), 'harvests'),
-    safe(fetchCollection('conversations'), 'conversations'),
+    safe(fetchConversations(), 'conversations'),
     safe(fetchOpenQuestions(), 'open-questions'),
+    safe(fetchResolvedQuestions(), 'open-questions-resolved'),
     safe(fetchCollection('intents'), 'intents'),
     safe(fetchCollection('assessments'), 'assessments'),
     safe(fetchCollection('observations'), 'observations'),
@@ -303,8 +344,9 @@ export async function loadAllData(): Promise<Record<string, any>> {
 
   return {
     forums, feed, workRequests, requirements, agendas, candidates,
-    harvests, conversations, openQuestions, intents, assessments,
-    observations, agentRecords, specifications, plans, specs, users, counts,
+    harvests, conversations, openQuestions, resolvedOpenQuestions, intents,
+    assessments, observations, agentRecords, specifications, plans, specs,
+    users, counts,
     _threadsBySlug: threadsBySlug,
   };
 }

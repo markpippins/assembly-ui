@@ -4,6 +4,7 @@ import { CheckCircle2, ChevronRight, Check } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
 import { StatusBadge } from '../components/StatusBadge';
 import { dataService } from '../services/dataService';
+import { formatDateTime } from '../utils/format';
 import { OpenQuestion } from '../types';
 
 export const ResolutionsView: React.FC = () => {
@@ -30,29 +31,33 @@ export const ResolutionsView: React.FC = () => {
           resolved.map((q) => (
             <div
               key={q.id}
-              className="bg-slate-800/60 border border-slate-700/80 rounded-xl p-5 space-y-3 shadow-sm hover:border-slate-600 transition-all"
+              className="app-panel p-4 space-y-3 hover:border-slate-600 transition-all"
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                  <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/40">
                     <Check className="w-3 h-3" />
                     RESOLVED
                   </span>
-                  <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-700">
+                  <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
                     {q.category}
                   </span>
                 </div>
-                <span className="font-mono text-[11px] text-slate-400">{q.id}</span>
+                <Link to={`/open-questions/${q.id}`} className="font-mono text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline">{q.id}</Link>
               </div>
 
-              <h2 className="text-base font-bold text-white font-poppins">{q.title}</h2>
-              {q.description && <p className="text-xs text-slate-300">{q.description}</p>}
+              <h2 className="text-base font-bold text-slate-900 dark:text-white font-poppins">{q.title}</h2>
+              {q.description && <p className="text-sm text-slate-700 dark:text-slate-300">{q.description}</p>}
 
-              <div className="pt-3 border-t border-slate-700/50 flex items-center justify-between text-xs font-mono text-slate-400">
-                <span>Answered by {q.answeredBy || 'Architect'}</span>
+            <div className="pt-3 border-t border-slate-200 dark:border-slate-700/50 flex items-center justify-between text-sm font-mono text-slate-500 dark:text-slate-400">
+              <span>
+                <span className="mr-3">Created {formatDateTime(q.createdAt)}</span>
+                <span className="mr-3">Answered by {q.answeredBy || 'Architect'}</span>
+                {q.answeredAt && <span>{formatDateTime(q.answeredAt)}</span>}
+              </span>
                 <Link
                   to={`/open-questions/${q.id}`}
-                  className="inline-flex items-center gap-1 text-emerald-400 hover:underline font-medium"
+                  className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 hover:underline font-medium"
                 >
                   <span>Review Resolution</span>
                   <ChevronRight className="w-3.5 h-3.5" />

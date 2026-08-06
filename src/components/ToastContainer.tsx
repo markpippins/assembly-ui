@@ -23,7 +23,7 @@ export const ToastContainer: React.FC = () => {
           {toast.type === 'success' && <CheckCircle className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />}
           {toast.type === 'error' && <AlertCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />}
           {toast.type === 'info' && <Info className="w-5 h-5 text-sky-400 shrink-0 mt-0.5" />}
-          <p className="text-xs font-medium flex-1 leading-relaxed">{toast.message}</p>
+          <p className="text-sm font-medium flex-1 leading-relaxed">{toast.message}</p>
           <button
             onClick={() => removeToast(toast.id)}
             className="p-1 text-slate-400 hover:text-white rounded-lg"

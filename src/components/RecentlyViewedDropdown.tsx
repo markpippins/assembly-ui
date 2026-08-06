@@ -37,7 +37,7 @@ export const RecentlyViewedDropdown: React.FC = () => {
           <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/50">
             <div className="flex items-center gap-2">
               <Clock className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-              <h3 className="text-xs font-bold font-poppins text-slate-900 dark:text-white">Recently Viewed</h3>
+              <h3 className="text-sm font-bold font-poppins text-slate-900 dark:text-white">Recently Viewed</h3>
             </div>
             {recentlyViewed.length > 0 && (
               <button
@@ -55,7 +55,7 @@ export const RecentlyViewedDropdown: React.FC = () => {
             {recentlyViewed.length === 0 ? (
               <div className="p-6 text-center text-slate-500 dark:text-slate-400 space-y-1.5">
                 <Sparkles className="w-5 h-5 mx-auto text-slate-400 dark:text-slate-600" />
-                <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">No recently viewed pages</p>
+                <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">No recently viewed pages</p>
                 <p className="text-[11px]">Navigate work requests, forums, or questions to populate quick links here.</p>
               </div>
             ) : (
@@ -73,7 +73,7 @@ export const RecentlyViewedDropdown: React.FC = () => {
                       <FileText className="w-3.5 h-3.5" />
                     </div>
                     <div className="truncate">
-                      <div className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                      <div className="text-sm font-semibold text-slate-800 dark:text-slate-200 truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
                         {item.title}
                       </div>
                       <div className="text-[10px] font-mono text-slate-400 uppercase tracking-wider">

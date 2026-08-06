@@ -53,7 +53,7 @@ export const RecentlyViewedProvider: React.FC<{ children: React.ReactNode }> = (
       if (match) {
         addRecentlyViewed({
           id: match.id,
-          title: match.title,
+          title: match.title ?? '',
           type: match.type,
           path: match.href,
         });

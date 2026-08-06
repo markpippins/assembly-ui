@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { Search, ChevronRight, FileText, HelpCircle, CheckSquare, MessageSquare } from 'lucide-react';
+import { Search, ChevronRight, FileText, HelpCircle, CheckSquare, MessageSquare, Calendar } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
 import { dataService } from '../services/dataService';
 
@@ -28,7 +28,7 @@ export const SearchView: React.FC = () => {
       const q = queryParam.toLowerCase();
 
       const reqs = dataService.getRequirements().filter(
-        (r) => r.title.toLowerCase().includes(q) || (r.description && r.description.toLowerCase().includes(q))
+        (r) => (r.title || '').toLowerCase().includes(q) || (r.description && r.description.toLowerCase().includes(q))
       );
 
       const wrs = dataService.getWorkRequests().filter(
@@ -39,7 +39,7 @@ export const SearchView: React.FC = () => {
         (o) => o.title.toLowerCase().includes(q) || (o.description && o.description.toLowerCase().includes(q))
       );
 
-      const ths = dataService.getThreads().filter(
+      const ths = dataService.getThreads('all').filter(
         (t) => t.title.toLowerCase().includes(q) || t.body.toLowerCase().includes(q)
       );
 
@@ -81,15 +81,15 @@ export const SearchView: React.FC = () => {
       ) : totalResults === 0 ? (
         <div className="bg-slate-800/40 border border-slate-800 rounded-xl p-8 text-center text-slate-400">
           <p className="text-sm font-medium">No matching items found for "{queryParam}"</p>
-          <p className="text-xs mt-1">Try searching for keywords like "Auth", "Database", "API", or "Schema".</p>
+          <p className="text-sm mt-1">Try searching for keywords like "Auth", "Database", "API", or "Schema".</p>
         </div>
       ) : (
         <div className="space-y-6">
           {/* Requirements */}
           {results.requirements.length > 0 && (
             <div className="space-y-3">
-              <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider font-mono flex items-center gap-2">
-                <CheckSquare className="w-4 h-4 text-emerald-400" />
+              <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider font-mono flex items-center gap-2">
+                <CheckSquare className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                 <span>Requirements ({results.requirements.length})</span>
               </h2>
               <div className="space-y-2">
@@ -97,10 +97,10 @@ export const SearchView: React.FC = () => {
                   <Link
                     key={r.id}
                     to={`/requirements/${r.id}`}
-                    className="block bg-slate-800/60 border border-slate-700/80 hover:border-indigo-500/60 rounded-xl p-4 transition-all"
+                    className="block app-panel p-4 transition-all hover:border-indigo-500/60"
                   >
                     <div className="flex justify-between items-center">
-                      <span className="font-bold text-white text-xs">{r.title}</span>
+                      <span className="font-bold text-slate-900 dark:text-white text-sm">{r.title}</span>
                       <span className="font-mono text-[10px] text-slate-400">{r.id}</span>
                     </div>
                   </Link>
@@ -112,7 +112,7 @@ export const SearchView: React.FC = () => {
           {/* Work Requests */}
           {results.workRequests.length > 0 && (
             <div className="space-y-3">
-              <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider font-mono flex items-center gap-2">
+              <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider font-mono flex items-center gap-2">
                 <FileText className="w-4 h-4 text-sky-400" />
                 <span>Work Requests ({results.workRequests.length})</span>
               </h2>
@@ -121,10 +121,10 @@ export const SearchView: React.FC = () => {
                   <Link
                     key={wr.id}
                     to={`/work-requests/${wr.id}`}
-                    className="block bg-slate-800/60 border border-slate-700/80 hover:border-indigo-500/60 rounded-xl p-4 transition-all"
+                    className="block app-panel p-4 transition-all hover:border-indigo-500/60"
                   >
                     <div className="flex justify-between items-center">
-                      <span className="font-bold text-white text-xs">{wr.title}</span>
+                      <span className="font-bold text-slate-900 dark:text-white text-sm">{wr.title}</span>
                       <span className="font-mono text-[10px] text-slate-400">{wr.id}</span>
                     </div>
                   </Link>
@@ -136,7 +136,7 @@ export const SearchView: React.FC = () => {
           {/* Open Questions */}
           {results.openQuestions.length > 0 && (
             <div className="space-y-3">
-              <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider font-mono flex items-center gap-2">
+              <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider font-mono flex items-center gap-2">
                 <HelpCircle className="w-4 h-4 text-amber-400" />
                 <span>Open Questions ({results.openQuestions.length})</span>
               </h2>
@@ -145,11 +145,35 @@ export const SearchView: React.FC = () => {
                   <Link
                     key={q.id}
                     to={`/open-questions/${q.id}`}
-                    className="block bg-slate-800/60 border border-slate-700/80 hover:border-indigo-500/60 rounded-xl p-4 transition-all"
+                    className="block app-panel p-4 transition-all hover:border-indigo-500/60"
                   >
                     <div className="flex justify-between items-center">
-                      <span className="font-bold text-white text-xs">{q.title}</span>
+                      <span className="font-bold text-slate-900 dark:text-white text-sm">{q.title}</span>
                       <span className="font-mono text-[10px] text-slate-400">{q.id}</span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Agendas */}
+          {results.agendas.length > 0 && (
+            <div className="space-y-3">
+              <h2 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider font-mono flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-purple-500 dark:text-purple-400" />
+                <span>Agendas ({results.agendas.length})</span>
+              </h2>
+              <div className="space-y-2">
+                {results.agendas.map((a) => (
+                  <Link
+                    key={a.id}
+                    to={`/agendas/${a.id}`}
+                    className="block app-panel p-4 transition-all hover:border-indigo-500/60"
+                  >
+                    <div className="flex justify-between items-center">
+                      <span className="font-bold text-slate-900 dark:text-white text-sm">{a.title}</span>
+                      <span className="font-mono text-[10px] text-slate-500 dark:text-slate-400">{a.id}</span>
                     </div>
                   </Link>
                 ))}
@@ -160,7 +184,7 @@ export const SearchView: React.FC = () => {
           {/* Threads */}
           {results.threads.length > 0 && (
             <div className="space-y-3">
-              <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider font-mono flex items-center gap-2">
+              <h2 className="text-sm font-bold text-slate-400 uppercase tracking-wider font-mono flex items-center gap-2">
                 <MessageSquare className="w-4 h-4 text-indigo-400" />
                 <span>Forum Threads ({results.threads.length})</span>
               </h2>
@@ -169,10 +193,10 @@ export const SearchView: React.FC = () => {
                   <Link
                     key={t.id}
                     to={`/forums/${t.forum.slug}/${t.id}`}
-                    className="block bg-slate-800/60 border border-slate-700/80 hover:border-indigo-500/60 rounded-xl p-4 transition-all"
+                    className="block app-panel p-4 transition-all hover:border-indigo-500/60"
                   >
                     <div className="flex justify-between items-center">
-                      <span className="font-bold text-white text-xs">{t.title}</span>
+                      <span className="font-bold text-slate-900 dark:text-white text-sm">{t.title}</span>
                       <span className="font-mono text-[10px] text-slate-400">By {t.author.name}</span>
                     </div>
                   </Link>

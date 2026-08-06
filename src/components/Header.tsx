@@ -51,7 +51,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSearch }) => {
         className="flex-1 max-w-xl relative cursor-pointer group"
       >
         <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 pointer-events-none group-hover:text-indigo-500 transition-colors" />
-        <div className="w-full h-9 pl-9 pr-3 text-xs bg-slate-100/90 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 rounded-lg text-slate-400 dark:text-slate-500 flex items-center justify-between transition-all group-hover:border-indigo-500/50 group-hover:ring-2 group-hover:ring-indigo-500/10">
+        <div className="w-full h-9 pl-9 pr-3 text-sm bg-slate-100/90 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 rounded-lg text-slate-400 dark:text-slate-500 flex items-center justify-between transition-all group-hover:border-indigo-500/50 group-hover:ring-2 group-hover:ring-indigo-500/10">
           <span className="truncate">Search work requests, requirements, agendas, questions...</span>
           <kbd className="hidden sm:inline-flex items-center gap-0.5 px-2 py-0.5 text-[10px] font-mono font-bold text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md shadow-xs shrink-0">
             <span className="text-[11px]">⌘</span>K
@@ -64,7 +64,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSearch }) => {
         {isPlaying && (
           <button
             onClick={stop}
-            className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium bg-rose-50 dark:bg-rose-500/20 border border-rose-200 dark:border-rose-500/40 text-rose-700 dark:text-rose-300 rounded-lg animate-pulse"
+            className="flex items-center gap-1.5 px-2.5 py-1 text-sm font-medium bg-rose-50 dark:bg-rose-500/20 border border-rose-200 dark:border-rose-500/40 text-rose-700 dark:text-rose-300 rounded-lg animate-pulse"
           >
             <Volume2 className="w-3.5 h-3.5" />
             <span>TTS Active</span>
@@ -75,7 +75,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSearch }) => {
         <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg p-0.5 border border-slate-200 dark:border-slate-700">
           <button
             onClick={() => setTheme('light')}
-            className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-all ${
+            className={`flex items-center gap-1 px-2 py-1 rounded-md text-sm font-medium transition-all ${
               theme === 'light'
                 ? 'bg-white text-indigo-600 shadow-sm border border-slate-200 font-semibold'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
@@ -99,7 +99,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSearch }) => {
           </button>
           <button
             onClick={() => setTheme('dark')}
-            className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-all ${
+            className={`flex items-center gap-1 px-2 py-1 rounded-md text-sm font-medium transition-all ${
               theme === 'dark'
                 ? 'bg-slate-900 text-sky-300 shadow-sm border border-slate-700 font-semibold'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'

@@ -4,6 +4,7 @@ import { BarChart3, ChevronRight, CheckCircle2 } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
 import { StatusBadge } from '../components/StatusBadge';
 import { dataService } from '../services/dataService';
+import { formatDateTime } from '../utils/format';
 import { Assessment } from '../types';
 
 export const AssessmentsView: React.FC = () => {
@@ -25,23 +26,26 @@ export const AssessmentsView: React.FC = () => {
         {assessments.map((a) => (
           <div
             key={a.id}
-            className="bg-slate-800/60 border border-slate-700/80 rounded-xl p-5 space-y-3 shadow-sm hover:border-slate-600 transition-all"
+            className="app-panel p-4 space-y-3 hover:border-slate-600 transition-all"
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <StatusBadge status={a.outcome} />
-                <span className="text-xs font-mono text-indigo-300">
+                <span className="text-sm font-mono text-indigo-600 dark:text-indigo-300">
                   Confidence: {a.confidence ? `${(a.confidence * 100).toFixed(0)}%` : 'N/A'}
                 </span>
               </div>
-              <span className="font-mono text-[11px] text-slate-400">{a.id}</span>
+              <Link to={`/assessments/${a.id}`} className="font-mono text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline">{a.id}</Link>
             </div>
 
-            <h2 className="text-base font-bold text-white font-poppins">Assessment for Observation: {a.observationId}</h2>
-            {a.analysisDetail && <p className="text-xs text-slate-300 bg-slate-900/50 p-3 rounded-lg border border-slate-700/50">{a.analysisDetail}</p>}
+            <h2 className="text-base font-bold text-slate-900 dark:text-white font-poppins">Assessment for Observation: {a.observationId}</h2>
+            {a.analysisDetail && <p className="text-sm text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-slate-200 dark:border-slate-700/50">{a.analysisDetail}</p>}
 
-            <div className="pt-3 border-t border-slate-700/50 flex items-center justify-between text-xs font-mono text-slate-400">
-              <span>Agenda Ref: {a.agendaId || 'N/A'}</span>
+            <div className="pt-3 border-t border-slate-200 dark:border-slate-700/50 flex items-center justify-between text-sm font-mono text-slate-500 dark:text-slate-400">
+              <span>
+                <span className="mr-3">Agenda Ref: {a.agendaId || 'N/A'}</span>
+                <span>{formatDateTime(a.createdAt)}</span>
+              </span>
               <Link
                 to={`/assessments/${a.id}`}
                 className="inline-flex items-center gap-1 text-indigo-400 hover:underline font-medium"

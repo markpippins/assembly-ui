@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { BarChart3, ChevronRight } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
 import { dataService } from '../services/dataService';
+import { formatDateTime } from '../utils/format';
 import { AgentRecord } from '../types';
 
 export const ReportsView: React.FC = () => {
@@ -27,21 +28,21 @@ export const ReportsView: React.FC = () => {
           </div>
         ) : (
           reports.map((rep) => (
-            <div key={rep.id} className="bg-slate-800/60 border border-slate-700/80 rounded-xl p-5 space-y-3 shadow-sm">
+            <div key={rep.id} className="app-panel p-4 space-y-3">
               <div className="flex items-center justify-between">
-                <span className="font-mono text-xs font-bold uppercase px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-300 border border-indigo-500/30">
+                <span className="font-mono text-sm font-bold uppercase px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 border border-indigo-500/30">
                   {rep.role || 'Report'}
                 </span>
-                <span className="font-mono text-[11px] text-slate-400">{rep.id}</span>
+                <Link to={`/agent-records/${rep.id}`} className="font-mono text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline">{rep.id}</Link>
               </div>
 
-              <h2 className="text-base font-bold text-white font-poppins">{rep.title}</h2>
-              <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-line bg-slate-900/40 p-3 rounded-lg border border-slate-700/50">
+              <h2 className="text-base font-bold text-slate-900 dark:text-white font-poppins">{rep.title}</h2>
+              <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-line bg-slate-50 dark:bg-slate-900/40 p-3 rounded-lg border border-slate-200 dark:border-slate-700/50">
                 {rep.content}
               </p>
 
-              <div className="pt-2 flex justify-between items-center text-xs font-mono text-slate-400">
-                <span>Created: {new Date(rep.createdAt).toLocaleDateString()}</span>
+              <div className="pt-2 flex justify-between items-center text-sm font-mono text-slate-500 dark:text-slate-400">
+                <span>Created: {formatDateTime(rep.createdAt)}</span>
                 <Link to={`/agent-records/${rep.id}`} className="text-indigo-400 hover:underline flex items-center gap-1">
                   <span>Full Report</span>
                   <ChevronRight className="w-3.5 h-3.5" />

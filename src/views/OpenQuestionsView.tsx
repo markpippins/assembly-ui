@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { HelpCircle, Plus, AlertTriangle, CheckCircle2, ChevronRight, X } from 'lucide-react';
+import { HelpCircle, Plus, AlertTriangle, CheckCircle2, ChevronRight, X, Calendar } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
 import { StatusBadge } from '../components/StatusBadge';
 import { dataService } from '../services/dataService';
+import { formatDateTime } from '../utils/format';
 import { useToast } from '../context/ToastContext';
 import { OpenQuestion } from '../types';
 
@@ -49,7 +50,7 @@ export const OpenQuestionsView: React.FC = () => {
         action={
           <button
             onClick={() => setShowCreateModal(true)}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg shadow-sm transition-all"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-lg shadow-sm transition-all"
           >
             <Plus className="w-4 h-4" />
             <span>Raise Question</span>
@@ -59,21 +60,21 @@ export const OpenQuestionsView: React.FC = () => {
 
       <div className="space-y-4">
         {questions.length === 0 ? (
-          <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-xl p-8 text-center text-slate-500 dark:text-slate-400 space-y-2 shadow-sm">
+          <div className="app-panel p-8 text-center text-slate-500 dark:text-slate-400 space-y-2">
             <CheckCircle2 className="w-8 h-8 mx-auto text-emerald-500" />
             <p className="text-sm font-semibold text-slate-900 dark:text-white">All questions resolved!</p>
-            <p className="text-xs text-slate-500 dark:text-slate-400">No active open questions. Raise a question if needed.</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400">No active open questions. Raise a question if needed.</p>
           </div>
         ) : (
           questions.map((q) => (
             <div
               key={q.id}
-              className="bg-white dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-xl p-5 space-y-3 shadow-sm hover:border-slate-300 dark:hover:border-slate-600 transition-all"
+              className="app-panel p-4 space-y-3 hover:border-slate-300 dark:hover:border-slate-600 transition-all"
             >
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <StatusBadge status={q.status} />
-                  <span className="text-[10px] font-mono font-semibold uppercase px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/20">
+                  <span className="text-[10px] font-mono font-semibold uppercase px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-600 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/20">
                     {q.category}
                   </span>
                   {q.blocking && (
@@ -83,14 +84,20 @@ export const OpenQuestionsView: React.FC = () => {
                     </span>
                   )}
                 </div>
-                <span className="font-mono text-[11px] text-slate-400 dark:text-slate-500">{q.id}</span>
+                <Link to={`/open-questions/${q.id}`} className="font-mono text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline">{q.id}</Link>
               </div>
 
               <h2 className="text-base font-bold text-slate-900 dark:text-white font-poppins">{q.title}</h2>
-              {q.description && <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">{q.description}</p>}
+              {q.description && <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">{q.description}</p>}
 
-              <div className="pt-3 border-t border-slate-100 dark:border-slate-700/50 flex items-center justify-between text-xs font-mono text-slate-500 dark:text-slate-400">
-                <span>Raised by {q.createdBy || 'Contributor'}</span>
+              <div className="pt-3 border-t border-slate-100 dark:border-slate-700/50 flex items-center justify-between text-sm font-mono text-slate-500 dark:text-slate-400">
+                <span className="flex items-center gap-3">
+                  <span>Raised by {q.createdBy || 'Contributor'}</span>
+                  <span className="flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                    {q.createdAt ? formatDateTime(q.createdAt) : '—'}
+                  </span>
+                </span>
                 <Link
                   to={`/open-questions/${q.id}`}
                   className="inline-flex items-center gap-1 text-indigo-600 dark:text-indigo-400 hover:underline font-semibold"
@@ -117,35 +124,35 @@ export const OpenQuestionsView: React.FC = () => {
 
             <form onSubmit={handleCreateQuestion} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Question Title</label>
+                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Question Title</label>
                 <input
                   type="text"
                   required
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="State the core decision or question..."
-                  className="w-full h-9 px-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-indigo-500"
+                  className="w-full h-9 px-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-indigo-500"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Description / Context</label>
+                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Description / Context</label>
                 <textarea
                   rows={3}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Detail the options, trade-offs, or missing information..."
-                  className="w-full p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-indigo-500 resize-none"
+                  className="w-full p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-indigo-500 resize-none"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Category</label>
+                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Category</label>
                   <select
                     value={category}
                     onChange={(e) => setCategory(e.target.value)}
-                    className="w-full h-9 px-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500"
+                    className="w-full h-9 px-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500"
                   >
                     <option value="DESIGN">Design</option>
                     <option value="ARCHITECTURE">Architecture</option>
@@ -155,7 +162,7 @@ export const OpenQuestionsView: React.FC = () => {
                 </div>
 
                 <div className="flex items-center pt-5">
-                  <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-700 dark:text-slate-200">
+                  <label className="flex items-center gap-2 cursor-pointer text-sm text-slate-700 dark:text-slate-200">
                     <input
                       type="checkbox"
                       checked={blocking}
@@ -171,13 +178,13 @@ export const OpenQuestionsView: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowCreateModal(false)}
-                  className="px-3 py-1.5 text-xs text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                  className="px-3 py-1.5 text-sm text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg shadow-sm"
+                  className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg shadow-sm"
                 >
                   Submit Question
                 </button>

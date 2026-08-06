@@ -79,6 +79,9 @@ function AnimatedRoutes() {
             <Route path="/forums/:slug" element={<ForumDetailView />} />
             <Route path="/forums/:slug/:threadId" element={<ThreadDetailView />} />
 
+            {/* To Do — dedicated top-level link to the to-do forum */}
+            <Route path="/todo" element={<ForumDetailView slug="to-do" />} />
+
             {/* Work Requests */}
             <Route path="/work-requests" element={<WorkRequestsView />} />
             <Route path="/work-requests/:id" element={<WorkRequestDetailView />} />
@@ -209,12 +212,12 @@ function HealthBanner() {
     <div className="sticky top-14 z-30 w-full bg-amber-50 dark:bg-amber-950/80 border-b border-amber-200 dark:border-amber-800 px-4 py-2 flex items-center justify-between text-sm">
       <div className="flex items-center gap-2 text-amber-800 dark:text-amber-200">
         <span className="inline-block w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-        <span className="font-medium text-xs">Backend unreachable — data may be stale</span>
+        <span className="font-medium text-sm">Backend unreachable — data may be stale</span>
       </div>
       <button
         onClick={handleRetry}
         disabled={checking}
-        className="px-3 py-1 text-xs font-medium bg-amber-200 dark:bg-amber-800 text-amber-900 dark:text-amber-100 rounded-md hover:bg-amber-300 dark:hover:bg-amber-700 disabled:opacity-50 transition-colors"
+        className="px-3 py-1 text-sm font-medium bg-amber-200 dark:bg-amber-800 text-amber-900 dark:text-amber-100 rounded-md hover:bg-amber-300 dark:hover:bg-amber-700 disabled:opacity-50 transition-colors"
       >
         {checking ? 'Checking…' : 'Retry'}
       </button>

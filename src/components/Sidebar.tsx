@@ -15,6 +15,7 @@ export const Sidebar: React.FC = () => {
     forums: 0,
     posts: 0,
     threads: 0,
+    toDoThreads: 0,
     comments: 0,
     workRequests: 0,
     requirements: 0,
@@ -43,6 +44,7 @@ export const Sidebar: React.FC = () => {
       items: [
         { label: 'Feed', path: '/feed', icon: Rss, badge: counts.posts },
         { label: 'Forums', path: '/forums', icon: MessageSquare, badge: counts.forums },
+        { label: 'To Do', path: '/todo', icon: CheckSquare, badge: counts.toDoThreads },
         { label: 'Open Questions', path: '/open-questions', icon: HelpCircle, badge: counts.openQuestions },
         { label: 'Resolutions', path: '/resolutions', icon: CheckCircle2 },
         { label: 'Conversations', path: '/conversations', icon: MessagesSquare },
@@ -101,7 +103,7 @@ export const Sidebar: React.FC = () => {
                     key={item.path}
                     to={item.path}
                     className={({ isActive }) =>
-                      `flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      `flex items-center justify-between px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                         isActive
                           ? 'bg-indigo-600 text-white font-semibold shadow-sm'
                           : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'
@@ -136,7 +138,7 @@ export const Sidebar: React.FC = () => {
                   key={item.path}
                   to={item.path}
                   className={({ isActive }) =>
-                    `flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-medium transition-colors group ${
+                    `flex items-center justify-between px-3 py-1.5 rounded-lg text-sm font-medium transition-colors group ${
                       isActive
                         ? 'bg-indigo-600/90 text-white font-semibold shadow-sm'
                         : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'

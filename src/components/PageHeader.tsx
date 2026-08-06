@@ -2,8 +2,8 @@ import React from 'react';
 import { TTSButton } from './TTSButton';
 
 interface PageHeaderProps {
-  title: string;
-  subtitle?: string;
+  title: React.ReactNode;
+  subtitle?: React.ReactNode;
   ttsContent?: string;
   action?: React.ReactNode;
   children?: React.ReactNode;
@@ -24,7 +24,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
             {title}
             {ttsContent && <TTSButton text={ttsContent} label="Read Page" />}
           </h1>
-          {subtitle && <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">{subtitle}</p>}
+          {subtitle && <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">{subtitle}</p>}
         </div>
         {action && <div className="flex items-center gap-2">{action}</div>}
       </div>

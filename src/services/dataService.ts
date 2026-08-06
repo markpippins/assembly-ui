@@ -87,6 +87,7 @@ const INITIAL_FORUMS: Forum[] = [
   { id: 'mock-forum-issues', slug: 'issues-and-open-questions', name: 'Issues & Open Questions', description: 'Questions, blockers, and unresolved decisions for the Nexus team.', sortOrder: 1, threadCount: 3, postCount: 7 },
   { id: 'mock-forum-change-log', slug: 'change-log', name: 'Change Log', description: 'Implementation updates and operational notes from the engineering team.', sortOrder: 2, threadCount: 2, postCount: 4 },
   { id: 'mock-forum-architecture', slug: 'architecture', name: 'Architecture', description: 'Design decisions, trade-offs, and system direction.', sortOrder: 3, threadCount: 2, postCount: 5 },
+  { id: 'mock-forum-to-do', slug: 'to-do', name: 'To Do', description: 'Actionable items, pending tasks, and todo threads tracked by the team.', sortOrder: 4, threadCount: 1, postCount: 2 },
 ];
 
 const INITIAL_THREADS: Thread[] = [
@@ -97,12 +98,14 @@ const INITIAL_THREADS: Thread[] = [
   { id: 'mock-thread-routing', title: 'Keep live API routes unchanged', body: 'Live mode continues to proxy /api and /nebula endpoints to the existing backend services.', createdAt: now, author: { id: 'mock-architect', name: 'Architect', avatar: 'A' }, forum: { id: 'mock-forum-change-log', slug: 'change-log', name: 'Change Log' }, replyCount: 0, viewCount: 15, lastReplyAt: null, lastReplyAuthor: null },
   { id: 'mock-thread-layout', title: 'Compact layout direction for Assembly', body: 'Favor dense information hierarchy while keeping interaction states discoverable across all entity screens.', createdAt: now, author: { id: 'mock-engineer', name: 'Engineer', avatar: 'E' }, forum: { id: 'mock-forum-architecture', slug: 'architecture', name: 'Architecture' }, replyCount: 3, viewCount: 42, lastReplyAt: now, lastReplyAuthor: 'Architect' },
   { id: 'mock-thread-boundary', title: 'Separate runtime mode from component views', body: 'The mode boundary belongs in the local service layer so UI code keeps its clean, production-ready contracts.', createdAt: now, author: { id: 'mock-architect', name: 'Architect', avatar: 'A' }, forum: { id: 'mock-forum-architecture', slug: 'architecture', name: 'Architecture' }, replyCount: 0, viewCount: 9, lastReplyAt: null, lastReplyAuthor: null },
+  { id: 'mock-thread-todo-1', title: 'Port remaining views to document card styling', body: 'Continue the assembly-ui parity pass: apply the app-panel document look and markdown rendering to any view still showing form-style cards.', createdAt: now, author: { id: 'mock-engineer', name: 'Engineer', avatar: 'E' }, forum: { id: 'mock-forum-to-do', slug: 'to-do', name: 'To Do' }, replyCount: 1, viewCount: 7, lastReplyAt: now, lastReplyAuthor: 'You (Mock)' },
 ];
 
 const INITIAL_COMMENTS: Comment[] = [
   { id: 'mock-comment-1', threadId: 'mock-thread-bootstrap', body: 'Use the mock server or reactive store as the local contract, then refine the components against it.', createdAt: now, parentId: null, author: { id: 'mock-engineer', name: 'Engineer', avatar: 'E' } },
   { id: 'mock-comment-2', threadId: 'mock-thread-bootstrap', body: 'Agreed. The live proxy interface should remain untouched for terrain-backed development.', createdAt: now, parentId: null, author: { id: 'mock-architect', name: 'Architect', avatar: 'A' } },
   { id: 'mock-comment-3', threadId: 'mock-thread-release', body: 'Great progress! The React rewrite carries over all views with responsive design.', createdAt: now, parentId: null, author: { id: '9abe1316-312e-4a2f-96ad-88c4b86c7b1e', name: 'You (Mock)', avatar: 'Y' } },
+  { id: 'mock-comment-todo-1', threadId: 'mock-thread-todo-1', body: 'Agreed — also remember to verify the threaded comment tree renders for to-do threads.', createdAt: now, parentId: null, author: { id: '9abe1316-312e-4a2f-96ad-88c4b86c7b1e', name: 'You (Mock)', avatar: 'Y' } },
 ];
 
 const INITIAL_FEED: FeedPost[] = [
@@ -281,13 +284,14 @@ class StorageService {
         forums: f.length,
         posts: feed.length,
         threads: 0, // threads loaded on demand
+        toDoThreads: ((liveCache as any)?.['_threads_to-do'] as any[] | undefined)?.length ?? 0,
         comments: 0,
         workRequests: liveList('workRequests').length,
         requirements: liveList('requirements').length,
         agendas: liveList('agendas').length,
         candidates: liveList('candidates').length,
         harvests: liveList('harvests').length,
-        openQuestions: liveList('openQuestions').filter((q: any) => q.status !== 'ANSWERED' && q.status !== 'RESOLVED').length,
+        openQuestions: liveList('openQuestions').filter((q: any) => q.answeredAt == null).length,
         intents: liveList('intents').length,
         assessments: liveList('assessments').length,
         observations: liveList('observations').length,
@@ -301,6 +305,7 @@ class StorageService {
       forums: s.forums.length,
       posts: s.feed.length,
       threads: s.threads.length,
+      toDoThreads: s.threads.filter((t: Thread) => t.forum.slug === 'to-do').length,
       comments: s.comments.length,
       workRequests: s.workRequests.length,
       requirements: s.requirements.length,
@@ -587,7 +592,23 @@ class StorageService {
   }
 
   getConversation(id: string): ConversationSnapshot | undefined {
-    return isLive() ? liveItem('conversations', id) : this.loadState().conversations.find((c: ConversationSnapshot) => c.id === id);
+    if (isLive()) {
+      const found = liveItem('conversations', id);
+      if (found) return found;
+      // Fire-and-forget by-snapshot load (nebula-srv), mirroring the Angular
+      // data.service migration: `id` is a snapshot_id; the single-item route
+      // lives on nebula-srv, not assembly-srv.
+      api.fetchConversation(id).then(snap => {
+        if (snap && liveCache) {
+          const list = liveList('conversations');
+          if (!list.some((c: any) => c.id === snap.id)) {
+            (liveCache as any)['conversations'] = [snap, ...list];
+          }
+        }
+      }).catch(() => {});
+      return undefined;
+    }
+    return this.loadState().conversations.find((c: ConversationSnapshot) => c.id === id);
   }
 
   getConversationBlocks(conversationId: string): ConversationBlock[] {
@@ -606,8 +627,26 @@ class StorageService {
 
   getOpenQuestions(resolved = false, requirementId?: string): OpenQuestion[] {
     if (isLive()) {
+      if (resolved) {
+        // Resolved questions come from the backend's `resolved=true` filter
+        // (Angular parity) — the unfiltered live list marks answered rows as
+        // status 'OPEN', so a client-side status check would miss them all.
+        const resolvedList = liveList('resolvedOpenQuestions');
+        if (resolvedList.length > 0) {
+          return resolvedList.filter((q: any) =>
+            !requirementId || q.requirementId === requirementId
+          );
+        }
+      }
       return liveList('openQuestions').filter((q: any) => {
-        const isRes = q.status === 'ANSWERED' || q.status === 'RESOLVED';
+        // Fallback (only reached when the resolved seed is unavailable): key
+        // off answeredAt — the backend's own signal — since the unfiltered
+        // list reports status 'OPEN' even for answered rows. The open branch
+        // keeps the status check so answered rows still appear, matching the
+        // Angular open-questions view (which lists everything unfiltered).
+        const isRes = resolved
+          ? q.answeredAt != null || q.status === 'ANSWERED' || q.status === 'RESOLVED'
+          : q.status === 'ANSWERED' || q.status === 'RESOLVED';
         if (resolved && !isRes) return false;
         if (!resolved && isRes) return false;
         if (requirementId && q.requirementId !== requirementId) return false;
