@@ -1,5 +1,5 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ThemeProvider } from './context/ThemeContext';
 import { TTSProvider } from './context/TTSContext';
@@ -35,6 +35,13 @@ const IntentsView = lazy(() => import('./views/IntentsView').then(m => ({ defaul
 const AssessmentsView = lazy(() => import('./views/AssessmentsView').then(m => ({ default: m.AssessmentsView })));
 const ObservationsView = lazy(() => import('./views/ObservationsView').then(m => ({ default: m.ObservationsView })));
 const AgentRecordsView = lazy(() => import('./views/AgentRecordsView').then(m => ({ default: m.AgentRecordsView })));
+const AgentsView = lazy(() => import('./views/AgentsView').then(m => ({ default: m.AgentsView })));
+
+// /agents/:id redirects to the agent-record detail (Angular parity).
+function AgentRedirect() {
+  const { id } = useParams();
+  return <Navigate to={`/agent-records/${id}`} replace />;
+}
 const ReportsView = lazy(() => import('./views/ReportsView').then(m => ({ default: m.ReportsView })));
 const SpecificationsView = lazy(() => import('./views/SpecificationsView').then(m => ({ default: m.SpecificationsView })));
 const SpecificationDetailView = lazy(() => import('./views/SpecificationDetailView').then(m => ({ default: m.SpecificationDetailView })));
@@ -124,6 +131,10 @@ function AnimatedRoutes() {
             {/* Observations */}
             <Route path="/observations" element={<ObservationsView />} />
             <Route path="/observations/:id" element={<EntityDetailView />} />
+
+            {/* Agents (table view) — :id redirects to the agent-record detail (Angular parity) */}
+            <Route path="/agents" element={<AgentsView />} />
+            <Route path="/agents/:id" element={<AgentRedirect />} />
 
             {/* Agent Records & Reports */}
             <Route path="/agent-records" element={<AgentRecordsView />} />
