@@ -29,7 +29,9 @@ export const WorkRequestsView: React.FC = () => {
       >
         <div className="flex items-center gap-2">
           <Filter className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+          <label htmlFor="wr-status-filter" className="sr-only">Filter by status</label>
           <select
+            id="wr-status-filter"
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
             className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1 text-sm text-slate-900 dark:text-slate-200 focus:outline-none focus:border-indigo-500"

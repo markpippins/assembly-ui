@@ -82,7 +82,9 @@ export const ThreadDetailView: React.FC = () => {
       </div>
       {replyingToId === comment.id && (
         <form onSubmit={(e) => handlePostComment(e, comment.id)} className={`mt-2 space-y-2 ${nested ? 'ml-7' : 'ml-9'}`}>
+          <label htmlFor={`reply-to-${comment.id}`} className="sr-only">Reply to {comment.author.name}</label>
           <textarea
+            id={`reply-to-${comment.id}`}
             value={replyText}
             onChange={(e) => setReplyText(e.target.value)}
             placeholder={`Replying to ${comment.author.name}...`}
@@ -153,7 +155,9 @@ export const ThreadDetailView: React.FC = () => {
       {/* Reply Form (document) — new root comment */}
       <form onSubmit={(e) => handlePostComment(e, null)} className="app-panel p-3 mb-4">
         <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-2">Add a comment</h3>
+        <label htmlFor="td-new-comment" className="sr-only">Add a comment</label>
         <textarea
+          id="td-new-comment"
           value={replyingToId ? '' : replyText}
           onChange={(e) => {
             setReplyingToId(null);

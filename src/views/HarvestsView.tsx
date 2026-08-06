@@ -61,7 +61,9 @@ export const HarvestsView: React.FC = () => {
 
             {editingId === h.id ? (
               <div className="space-y-2">
+                <label htmlFor={`harvest-edit-${h.id}`} className="sr-only">Edit harvest source text</label>
                 <textarea
+                  id={`harvest-edit-${h.id}`}
                   rows={5}
                   value={editText}
                   onChange={(e) => setEditText(e.target.value)}

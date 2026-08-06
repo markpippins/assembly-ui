@@ -158,8 +158,10 @@ export const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => 
         {/* Input Header */}
         <div className="relative flex items-center px-4 py-3.5 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
           <Search className="w-5 h-5 text-indigo-600 dark:text-indigo-400 shrink-0 mr-3" />
+          <label htmlFor="search-modal-input" className="sr-only">Search</label>
           <input
             ref={inputRef}
+            id="search-modal-input"
             type="text"
             value={query}
             onChange={(e) => {

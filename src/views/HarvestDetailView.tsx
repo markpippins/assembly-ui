@@ -501,7 +501,9 @@ export const HarvestDetailView: React.FC = () => {
             {/* Search Input */}
             <div className="relative flex-1 sm:w-64">
               <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <label htmlFor="hd-search" className="sr-only">Search discourse</label>
               <input
+                id="hd-search"
                 type="text"
                 placeholder="Search discourse..."
                 value={searchQuery}

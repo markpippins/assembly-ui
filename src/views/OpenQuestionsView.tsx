@@ -124,8 +124,9 @@ export const OpenQuestionsView: React.FC = () => {
 
             <form onSubmit={handleCreateQuestion} className="space-y-4">
               <div>
-                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Question Title</label>
+                <label htmlFor="oq-title" className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Question Title</label>
                 <input
+                  id="oq-title"
                   type="text"
                   required
                   value={title}
@@ -136,8 +137,9 @@ export const OpenQuestionsView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Description / Context</label>
+                <label htmlFor="oq-description" className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Description / Context</label>
                 <textarea
+                  id="oq-description"
                   rows={3}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
@@ -148,8 +150,9 @@ export const OpenQuestionsView: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Category</label>
+                  <label htmlFor="oq-category" className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Category</label>
                   <select
+                    id="oq-category"
                     value={category}
                     onChange={(e) => setCategory(e.target.value)}
                     className="w-full h-9 px-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500"

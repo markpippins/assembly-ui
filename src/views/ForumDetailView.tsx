@@ -142,8 +142,9 @@ export const ForumDetailView: React.FC<{ slug?: string }> = ({ slug: slugProp })
 
             <form onSubmit={handleCreateThread} className="space-y-4">
               <div>
-                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Thread Title</label>
+                <label htmlFor="fd-title" className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Thread Title</label>
                 <input
+                  id="fd-title"
                   type="text"
                   required
                   value={title}
@@ -154,8 +155,9 @@ export const ForumDetailView: React.FC<{ slug?: string }> = ({ slug: slugProp })
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Content / Details</label>
+                <label htmlFor="fd-body" className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Content / Details</label>
                 <textarea
+                  id="fd-body"
                   rows={5}
                   required
                   value={body}

@@ -103,8 +103,9 @@ export const OpenQuestionDetailView: React.FC = () => {
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Responding Role</label>
+            <label htmlFor="oq-role" className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Responding Role</label>
             <select
+              id="oq-role"
               value={role}
               onChange={(e) => setRole(e.target.value)}
               className="w-full h-9 px-3 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100 focus:outline-none focus:border-indigo-500"
@@ -117,8 +118,9 @@ export const OpenQuestionDetailView: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Confidence</label>
+            <label htmlFor="oq-confidence" className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Confidence</label>
             <select
+              id="oq-confidence"
               value={confidence}
               onChange={(e) => setConfidence(e.target.value)}
               className="w-full h-9 px-3 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100 focus:outline-none focus:border-indigo-500"
@@ -131,8 +133,9 @@ export const OpenQuestionDetailView: React.FC = () => {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Answer Decision</label>
+          <label htmlFor="oq-answer" className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Answer Decision</label>
           <textarea
+            id="oq-answer"
             required
             rows={3}
             value={answerText}
@@ -143,8 +146,9 @@ export const OpenQuestionDetailView: React.FC = () => {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Supporting Reasoning (Optional)</label>
+          <label htmlFor="oq-reasoning" className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Supporting Reasoning (Optional)</label>
           <input
+            id="oq-reasoning"
             type="text"
             value={reasoning}
             onChange={(e) => setReasoning(e.target.value)}

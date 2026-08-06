@@ -108,8 +108,9 @@ export const ForumsView: React.FC = () => {
 
             <form onSubmit={handleCreateForum} className="space-y-4">
               <div>
-                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Forum Name</label>
+                <label htmlFor="forum-name" className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Forum Name</label>
                 <input
+                  id="forum-name"
                   type="text"
                   required
                   value={name}
@@ -120,8 +121,9 @@ export const ForumsView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Description</label>
+                <label htmlFor="forum-description" className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Description</label>
                 <textarea
+                  id="forum-description"
                   rows={3}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
