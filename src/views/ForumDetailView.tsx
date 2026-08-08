@@ -26,7 +26,24 @@ export const ForumDetailView: React.FC<{ slug?: string }> = ({ slug: slugProp })
       const allForums = dataService.getForums();
       const current = allForums.find((f) => f.slug === slug);
       if (current) setForum(current);
-      setThreads(dataService.getThreads(slug));
+      const threads = dataService.getThreads(slug);
+      setThreads(threads);
+      // In live mode, threads are loaded async, so re-check after a delay
+      const isLiveMode = (import.meta.env.ASSEMBLY_MODE || 'mock') === 'live';
+      if (isLiveMode && threads.length === 0) {
+        let attempts = 0;
+        const maxAttempts = 10;
+        const checkThreads = () => {
+          attempts++;
+          const updatedThreads = dataService.getThreads(slug);
+          if (updatedThreads.length > 0) {
+            setThreads(updatedThreads);
+          } else if (attempts < maxAttempts) {
+            window.setTimeout(checkThreads, 300);
+          }
+        };
+        window.setTimeout(checkThreads, 300);
+      }
     }
   }, [slug]);
 

@@ -458,6 +458,20 @@ class StorageService {
         parentId: data.parentId || null,
         author: { id: user.id, name: user.name, avatar: user.avatar || user.name?.[0] || '?' },
       };
+      // Add to cache immediately so it appears in the UI
+      const cacheKey = '_comments_' + threadId;
+      if (!Array.isArray((liveCache as any)[cacheKey])) {
+        (liveCache as any)[cacheKey] = [];
+      }
+      (liveCache as any)[cacheKey].push(newComment);
+      // Also update thread metadata
+      const threadCacheKey = '_threadDetail_' + threadId;
+      const thread = (liveCache as any)[threadCacheKey];
+      if (thread) {
+        thread.replyCount = (thread.replyCount || 0) + 1;
+        thread.lastReplyAt = newComment.createdAt;
+        thread.lastReplyAuthor = user.name;
+      }
       api.addComment(threadId, data).catch(() => {});
       return newComment;
     }

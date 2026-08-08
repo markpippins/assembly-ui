@@ -27,7 +27,26 @@ export const ThreadDetailView: React.FC = () => {
     if (res.comments.length) setComments(res.comments);
     // In live mode the API fetch resolves asynchronously into the cache after this
     // synchronous read — re-read shortly after so cold deep-links render too.
-    if (!res.thread && !res.comments.length) {
+    // Always re-check in live mode because comments are loaded async via api.fetchThread()
+    // which populates the cache after the initial synchronous return.
+    const isLiveMode = (import.meta.env.ASSEMBLY_MODE || 'mock') === 'live';
+    if (isLiveMode && !res.comments.length) {
+      // In live mode, if comments are empty, keep checking until they load (with safety limit)
+      let attempts = 0;
+      const maxAttempts = 10;
+      const checkComments = () => {
+        attempts++;
+        const r2 = dataService.getThread(threadId);
+        if (r2.comments.length) {
+          setComments(r2.comments);
+        } else if (attempts < maxAttempts) {
+          // Try again after a delay
+          window.setTimeout(checkComments, 300);
+        }
+      };
+      window.setTimeout(checkComments, 300);
+    } else if (!res.thread && !res.comments.length) {
+      // In mock mode, only re-check if both are empty
       window.setTimeout(() => {
         const r2 = dataService.getThread(threadId);
         if (r2.thread) setThread(r2.thread);
