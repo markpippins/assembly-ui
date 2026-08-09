@@ -1,23 +1,24 @@
+// server.js — Assembly mock-fixture API only.
+//
+// Architect decision (thread 50aa2af6, RATIFIED Path A, 2026-08-09):
+//   server.js is kept ONLY for the mock-fixture API (port 33107, backed by
+//   mock-data.js). The static-file-serving and live-proxy branches have been
+//   removed from `npm start` — Vite owns dev/live mode (see dev.js and
+//   vite.config.ts), and static hosting owns production.
+//
+// Mock mode keeps the same in-memory API surface used by `npm run dev`
+// (ASSEMBLY_API_ONLY=true) and by `npm start`:
+//   http://localhost:33107  → /api/* fixture endpoints, /nebula/* fixtures.
+//
+// env: MOCK_API_PORT (default 33107). ASSEMBLY_API_ONLY=true remains
+// accepted for compatibility with dev.js; it is now the only behavior.
 import express from 'express';
-import { createProxyMiddleware } from 'http-proxy-middleware';
-import path from 'path';
-import fs from 'fs';
-import { fileURLToPath } from 'url';
-import { ASSEMBLY_MODE, ASSEMBLY_PORT, IS_MOCK_MODE } from './runtime-config.js';
+// Side-effect: loads .env (MOCK_API_PORT etc.) before any env reads below.
+import './runtime-config.js';
 import { allEntityCollections, newId, nowIso, state } from './mock-data.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
-const API_ONLY = process.env.ASSEMBLY_API_ONLY === 'true';
-const PORT = API_ONLY ? Number.parseInt(process.env.MOCK_API_PORT || '33107', 10) : ASSEMBLY_PORT;
-const API_TARGET = process.env.API_TARGET || 'http://localhost:3107';
-const NEBULA_TARGET = process.env.NEBULA_TARGET || 'http://localhost:3101';
-const DIST_DIR = path.join(__dirname, 'dist/assembly');
-
-if (!API_ONLY && !fs.existsSync(DIST_DIR)) {
-  console.error(`Error: Build output not found at ${DIST_DIR}. Run "npm run build" first.`);
-  process.exit(1);
-}
+const PORT = Number.parseInt(process.env.MOCK_API_PORT || '33107', 10);
 
 app.use(express.json());
 
@@ -221,46 +222,10 @@ function mockApi() {
   app.get('/nebula/conversations/by-snapshot/:id/blocks', (_req, res) => res.json({ blocks: [{ id: 'mock-block-1', conversationId: 'mock-conversation-001', snapshotId: 'mock-conversation-001', blockIndex: 0, parentTurnId: null, parentBlockId: null, blockType: 'message', contentMd: 'This is a representative mock conversation block.', contentHash: 'mock-block-hash', role: 'assistant', domPath: null, domFingerprint: null, firstLineNo: 1, lastLineNo: 1, createdAt: nowIso() }], segments: [], overrides: [] }));
 }
 
-if (IS_MOCK_MODE) {
-  mockApi();
-} else {
-  app.use(createProxyMiddleware({
-    pathFilter: '/api',
-    target: API_TARGET,
-    changeOrigin: true,
-    logger: process.env.DEBUG_PROXY ? console : { debug: () => {}, info: () => {}, warn: () => {}, error: () => {} },
-    on: {
-      proxyReq: (proxyReq, req) => console.log('[proxy]', req.method, req.url, '->', proxyReq.path),
-    },
-  }));
-  app.use(createProxyMiddleware({
-    pathFilter: '/nebula',
-    target: NEBULA_TARGET,
-    changeOrigin: true,
-    pathRewrite: { '^/nebula': '/api' },
-    logger: process.env.DEBUG_PROXY ? console : { debug: () => {}, info: () => {}, warn: () => {}, error: () => {} },
-  }));
-}
-
-if (!API_ONLY) {
-  app.use(express.static(DIST_DIR));
-  app.use((req, res) => {
-    if (req.path.startsWith('/api') || req.path.startsWith('/nebula') || req.path === '/tts') {
-      res.status(404).send('Not found');
-      return;
-    }
-    res.sendFile(path.join(DIST_DIR, 'index.html'));
-  });
-}
+mockApi();
 
 const server = app.listen(PORT, () => {
-  if (API_ONLY) {
-    console.log(`Assembly mock API running on http://localhost:${PORT}`);
-  } else {
-    console.log(`Assembly UI server running on http://localhost:${PORT} [${ASSEMBLY_MODE.toUpperCase()}]`);
-    if (IS_MOCK_MODE) console.log('Serving in-memory Assembly API fixtures; no backend services required.');
-    else console.log(`Proxying /api to ${API_TARGET} and /nebula to ${NEBULA_TARGET}`);
-  }
+  console.log(`Assembly mock API running on http://localhost:${PORT}`);
 });
 
 server.on('error', (err) => {
