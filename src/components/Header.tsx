@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Search, Sun, Moon, Volume2, Cpu, Settings as SettingsIcon, Layers } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { useTTS } from '../context/TTSContext';
+import { useIdentity } from '../context/IdentityContext';
 import { Avatar } from './Avatar';
 import { NotificationCenter } from './NotificationCenter';
 import { RecentlyViewedDropdown } from './RecentlyViewedDropdown';
@@ -15,6 +16,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSearch }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const { theme, setTheme } = useTheme();
   const { isPlaying, stop } = useTTS();
+  const { currentUser } = useIdentity();
   const navigate = useNavigate();
 
   const handleSearch = (e: React.FormEvent) => {
@@ -126,9 +128,16 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSearch }) => {
           <SettingsIcon className="w-4 h-4" />
         </Link>
 
-        {/* User Profile Avatar */}
-        <Link to="/profile/9abe1316-312e-4a2f-96ad-88c4b86c7b1e" className="flex items-center gap-2 pl-2 border-l border-slate-200 dark:border-slate-800" title="Your Profile">
-          <Avatar name="User Contributor" email="mpippins@gmail.com" size="sm" showStatus={true} />
+        {/* Identity — posting as */}
+        <Link
+          to={`/profile/${currentUser?.id ?? '9abe1316-312e-4a2f-96ad-88c4b86c7b1e'}`}
+          className="flex items-center gap-2 pl-2 border-l border-slate-200 dark:border-slate-800 group"
+          title={`Posting as ${currentUser?.name ?? 'User Contributor'}`}
+        >
+          <Avatar name={currentUser?.name ?? 'User Contributor'} email={currentUser?.email ?? undefined} size="sm" showStatus={true} />
+          <span className="hidden lg:inline text-xs font-medium text-slate-600 dark:text-slate-300 group-hover:text-indigo-600 dark:group-hover:text-indigo-300 transition-colors">
+            {currentUser?.name ?? 'Profile'}
+          </span>
         </Link>
       </div>
     </header>

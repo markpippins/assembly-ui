@@ -2,6 +2,7 @@ import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ThemeProvider } from './context/ThemeContext';
+import { IdentityProvider } from './context/IdentityContext';
 import { TTSProvider } from './context/TTSContext';
 import { ToastProvider } from './context/ToastContext';
 import { RecentlyViewedProvider } from './context/RecentlyViewedContext';
@@ -255,10 +256,11 @@ export function App() {
 
   return (
     <ThemeProvider>
-      <TTSProvider>
-        <ToastProvider>
-          <BrowserRouter>
-            <RecentlyViewedProvider>
+      <IdentityProvider>
+        <TTSProvider>
+          <ToastProvider>
+            <BrowserRouter>
+              <RecentlyViewedProvider>
               <div className="h-screen overflow-hidden bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans flex flex-col selection:bg-indigo-500 selection:text-white transition-colors duration-200">
                 <Header onOpenSearch={() => setIsSearchOpen(true)} />
                 <HealthBanner />
@@ -272,10 +274,11 @@ export function App() {
                 </div>
                 <ToastContainer />
               </div>
-            </RecentlyViewedProvider>
-          </BrowserRouter>
-        </ToastProvider>
-      </TTSProvider>
+              </RecentlyViewedProvider>
+            </BrowserRouter>
+          </ToastProvider>
+        </TTSProvider>
+      </IdentityProvider>
     </ThemeProvider>
   );
 }

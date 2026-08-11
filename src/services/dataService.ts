@@ -276,6 +276,50 @@ class StorageService {
     localStorage.removeItem(this.key);
   }
 
+  // ── Identity (who posts) ──────────────────────────────────────────
+  // The user's posting identity is persisted per-browser. Until one is chosen,
+  // comments/threads fall back to the first user (previous behavior: admin).
+  private readonly IDENTITY_KEY = 'assembly.currentUserId';
+
+  private getStoredUserId(): string | null {
+    try { return localStorage.getItem(this.IDENTITY_KEY); } catch { return null; }
+  }
+
+  setCurrentUser(id: string | null): void {
+    try {
+      if (id) localStorage.setItem(this.IDENTITY_KEY, id);
+      else localStorage.removeItem(this.IDENTITY_KEY);
+    } catch { /* ignore */ }
+  }
+
+  getCurrentUser(): User | null {
+    const users = this.getUsers();
+    if (!users || users.length === 0) return null;
+    const stored = this.getStoredUserId();
+    if (stored) {
+      const found = users.find((u: User) => u.id === stored);
+      if (found) return found;
+      this.setCurrentUser(null); // stale identity — clear it
+    }
+    return users[0];
+  }
+
+  /** postedById arg wins; then the stored identity; then the first user. */
+  private resolveUser(postedById: string | undefined, users: User[]): User {
+    const fallback: User = { id: 'anon', name: 'Anonymous', avatar: '?', email: '', createdAt: new Date().toISOString() };
+    if (!users || users.length === 0) return fallback;
+    if (postedById) {
+      const byArg = users.find((u: User) => u.id === postedById);
+      if (byArg) return byArg;
+    }
+    const stored = this.getStoredUserId();
+    if (stored) {
+      const byStored = users.find((u: User) => u.id === stored);
+      if (byStored) return byStored;
+    }
+    return users[0];
+  }
+
   getCounts(): Counts {
     if (isLive()) {
       const f = this.liveForums();
@@ -386,7 +430,7 @@ class StorageService {
         liveCache!.forums = forums;
       }
       const users = liveList('users');
-      const user = users.find((u: any) => u.id === data.postedById) || users[0] || { id: 'anon', name: 'Anonymous', avatar: '?' };
+      const user = this.resolveUser(data.postedById, users as User[]);
       const newThread: Thread = {
         id: `thread-${Date.now()}`,
         title: data.title, body: data.body,
@@ -398,7 +442,7 @@ class StorageService {
       const cacheKey = '_threads_' + slug;
       if (!(liveCache as any)[cacheKey]) (liveCache as any)[cacheKey] = [];
       (liveCache as any)[cacheKey].unshift(newThread);
-      api.createThread(slug, data).catch(() => {});
+      api.createThread(slug, { ...data, postedById: user.id, role: user.name, model: 'assembly-ui' }).catch(() => {});
       return newThread;
     }
     const s = this.loadState();
@@ -407,7 +451,7 @@ class StorageService {
       forum = { id: `forum-${Date.now()}`, slug, name: slug.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '), description: `Discussions and threads for ${slug}`, sortOrder: s.forums.length + 1, threadCount: 0, postCount: 0 };
       s.forums.push(forum);
     }
-    const user = s.users.find((u: User) => u.id === data.postedById) || s.users[0];
+    const user = this.resolveUser(data.postedById, s.users);
     const newThread: Thread = {
       id: `thread-${Date.now()}`, title: data.title, body: data.body,
       createdAt: new Date().toISOString(),
@@ -450,7 +494,7 @@ class StorageService {
   addComment(threadId: string, data: { body: string; postedById?: string; parentId?: string | null }): Comment {
     if (isLive()) {
       const users = liveList('users');
-      const user = users.find((u: any) => u.id === data.postedById) || users[0] || { id: 'anon', name: 'Anonymous', avatar: '?' };
+      const user = this.resolveUser(data.postedById, users as User[]);
       const newComment: Comment = {
         id: `comment-${Date.now()}`,
         threadId, body: data.body,
@@ -475,13 +519,17 @@ class StorageService {
       // The server requires postedById — inject the resolved user so live
       // comments actually persist (previously every live-mode post 400'd and
       // the error was swallowed, leaving only the optimistic cache entry).
-      api.addComment(threadId, { ...data, postedById: data.postedById ?? user.id }).catch((err) => {
+      // role/model are persisted by assembly-srv for attribution: role is the
+      // picked user's name (e.g. 'architect', 'alice') — attribution label,
+      // not a strict role enum. 'anon' fallback only occurs if users[] is
+      // empty (degraded state) and would 400 server-side; acceptable edge.
+      api.addComment(threadId, { ...data, postedById: user.id, role: user.name, model: 'assembly-ui' }).catch((err) => {
         console.error('[assembly-ui] addComment failed to persist:', err);
       });
       return newComment;
     }
     const s = this.loadState();
-    const user = s.users.find((u: User) => u.id === data.postedById) || s.users[0];
+    const user = this.resolveUser(data.postedById, s.users);
     const newComment: Comment = {
       id: `comment-${Date.now()}`, threadId, body: data.body,
       createdAt: new Date().toISOString(),
@@ -506,7 +554,7 @@ class StorageService {
   createFeedPost(data: { title?: string; text: string; postedById?: string }): FeedPost {
     if (isLive()) {
       const users = liveList('users');
-      const user = users.find((u: any) => u.id === data.postedById) || users[0] || { id: 'anon', name: 'Anonymous', avatar: '?' };
+      const user = this.resolveUser(data.postedById, users as User[]);
       const newPost: FeedPost = {
         id: `post-${Date.now()}`,
         title: data.title || (data.text.length > 40 ? data.text.substring(0, 40) + '...' : data.text),
@@ -517,11 +565,11 @@ class StorageService {
         forum: null,
       };
       liveCache!.feed.unshift(newPost);
-      api.createFeedPost({ text: data.text, postedById: data.postedById }).catch(() => {});
+      api.createFeedPost({ text: data.text, postedById: user.id }).catch(() => {});
       return newPost;
     }
     const s = this.loadState();
-    const user = s.users.find((u: User) => u.id === data.postedById) || s.users[0];
+    const user = this.resolveUser(data.postedById, s.users);
     const newPost: FeedPost = {
       id: `post-${Date.now()}`,
       title: data.title || (data.text.length > 40 ? data.text.substring(0, 40) + '...' : data.text),

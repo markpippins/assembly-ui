@@ -93,7 +93,7 @@ export async function fetchThreads(slug: string) {
   return Array.isArray(result) ? result : result.items ?? [];
 }
 
-export async function createThread(slug: string, data: { title: string; body: string; postedById?: string }) {
+export async function createThread(slug: string, data: { title: string; body: string; postedById?: string; role?: string | null; model?: string | null }) {
   return request<any>(listUrl(`/forums/${slug}/threads`), {
     method: 'POST',
     body: JSON.stringify(data),
@@ -104,7 +104,7 @@ export async function fetchThread(threadId: string): Promise<{ thread: any; comm
   return request(listUrl(`/forums/threads/${threadId}`));
 }
 
-export async function addComment(threadId: string, data: { body: string; postedById?: string; parentId?: string | null }) {
+export async function addComment(threadId: string, data: { body: string; postedById?: string; parentId?: string | null; role?: string | null; model?: string | null }) {
   return request<any>(listUrl(`/forums/threads/${threadId}/comments`), {
     method: 'POST',
     body: JSON.stringify(data),
