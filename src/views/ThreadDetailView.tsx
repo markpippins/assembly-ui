@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Send, CornerDownRight } from 'lucide-react';
+import { Send, CornerDownRight, CheckCircle2 } from 'lucide-react';
 import { Avatar } from '../components/Avatar';
 import { TTSButton } from '../components/TTSButton';
-import { MarkdownRenderer } from '../components/MarkdownRenderer';
+import { InteractiveMarkdown, buildSelectionBody } from '../components/InteractiveMarkdown';
 import { dataService } from '../services/dataService';
 import { formatDateTime } from '../utils/format';
 import { useToast } from '../context/ToastContext';
@@ -15,6 +15,10 @@ export const ThreadDetailView: React.FC = () => {
   const [comments, setComments] = useState<Comment[]>([]);
   const [replyText, setReplyText] = useState('');
   const [replyingToId, setReplyingToId] = useState<string | null>(null);
+  // Interactive task-list agreement state: checkedMap keyed `${sourceId}:${blockIdx}:${itemIdx}`.
+  const [checkedTasks, setCheckedTasks] = useState<Record<string, boolean>>({});
+  // sourceIds ('thread' or comment id) that already submitted an agreement reply.
+  const [submittedFor, setSubmittedFor] = useState<Set<string>>(new Set());
   const { showToast } = useToast();
 
   const loadData = () => {
@@ -74,11 +78,89 @@ export const ThreadDetailView: React.FC = () => {
     loadData();
   };
 
+  const handleTaskToggle = (sourceId: string, blockIdx: number, itemIdx: number, checked: boolean) => {
+    setCheckedTasks((prev) => {
+      const next = { ...prev };
+      const key = `${sourceId}:${blockIdx}:${itemIdx}`;
+      if (checked) next[key] = true;
+      else delete next[key];
+      return next;
+    });
+  };
+
+  const countCheckedFor = (sourceId: string) =>
+    Object.keys(checkedTasks).filter((k) => k.startsWith(`${sourceId}:`)).length;
+
+  const clearSource = (sourceId: string) => {
+    setCheckedTasks((prev) => {
+      const next = { ...prev };
+      Object.keys(next).forEach((k) => {
+        if (k.startsWith(`${sourceId}:`)) delete next[k];
+      });
+      return next;
+    });
+  };
+
+  const handleSubmitSelection = (sourceId: string, sourceBody: string, parentId: string | null) => {
+    if (!threadId) return;
+    const body = buildSelectionBody(sourceBody, sourceId, checkedTasks);
+    dataService.addComment(threadId, { body, parentId });
+    clearSource(sourceId);
+    setSubmittedFor((prev) => new Set(prev).add(sourceId));
+    showToast('Agreement posted as reply', 'success');
+    loadData();
+  };
+
+  // Agreement bar: appears under any source (thread body or comment) with checked items.
+  const SelectionBar: React.FC<{ sourceId: string; sourceBody: string; parentId: string | null }> = ({
+    sourceId,
+    sourceBody,
+    parentId,
+  }) => {
+    if (submittedFor.has(sourceId)) {
+      return (
+        <div className="mt-2 flex items-center gap-1.5 text-xs text-primary-600 dark:text-primary-400">
+          <CheckCircle2 className="w-3.5 h-3.5" />
+          Agreement posted as a reply
+        </div>
+      );
+    }
+    const count = countCheckedFor(sourceId);
+    if (count === 0) return null;
+    return (
+      <div className="mt-2 flex items-center justify-between gap-3 rounded-lg border border-primary-500/30 bg-primary-50 dark:bg-primary-950/40 px-3 py-2">
+        <span className="text-xs font-medium text-primary-700 dark:text-primary-300">
+          Agreed items ({count})
+        </span>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => clearSource(sourceId)}
+            className="text-xs text-gray-500 hover:text-gray-800 dark:hover:text-white transition-colors"
+          >
+            Clear
+          </button>
+          <button
+            type="button"
+            onClick={() => handleSubmitSelection(sourceId, sourceBody, parentId)}
+            className="app-btn-primary px-2.5 py-1 text-xs"
+          >
+            Submit selection
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   // Threaded comment tree, mirroring the Angular template's rootComments()/childComments().
   const rootComments = comments.filter((c) => !c.parentId);
   const childComments = (parentId: string) => comments.filter((c) => c.parentId === parentId);
 
-  const CommentBody: React.FC<{ comment: Comment; nested: boolean }> = ({ comment, nested }) => (
+  const CommentBody: React.FC<{ comment: Comment; nested: boolean }> = ({ comment, nested }) => {
+    // Agreement replies (produced by Submit selection) are durable records, not
+    // re-agreeable lists — render them non-interactive.
+    const isAgreementReply = comment.body.trim().startsWith('**Agreed selection:**');
+    return (
     <>
       <div className="flex items-center gap-2">
         <Avatar name={comment.author.name} avatar={comment.author.avatar} size="sm" />
@@ -90,7 +172,16 @@ export const ThreadDetailView: React.FC = () => {
         </div>
       </div>
       <div className={`mt-1 ${nested ? 'ml-7' : 'ml-9'}`}>
-        <MarkdownRenderer content={comment.body} />
+        <InteractiveMarkdown
+          content={comment.body}
+          sourceId={comment.id}
+          checkedMap={checkedTasks}
+          onToggle={handleTaskToggle}
+          disabled={submittedFor.has(comment.id) || isAgreementReply}
+        />
+        {!isAgreementReply && (
+          <SelectionBar sourceId={comment.id} sourceBody={comment.body} parentId={comment.id} />
+        )}
         <button
           onClick={() => setReplyingToId(replyingToId === comment.id ? null : comment.id)}
           className="mt-1.5 inline-flex items-center gap-1 text-[11px] text-gray-500 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-300 transition-colors"
@@ -125,7 +216,8 @@ export const ThreadDetailView: React.FC = () => {
         </form>
       )}
     </>
-  );
+    );
+  };
 
   if (!thread) {
     return (
@@ -167,7 +259,14 @@ export const ThreadDetailView: React.FC = () => {
           </div>
         </div>
         <div className="mt-4">
-          <MarkdownRenderer content={thread.body} />
+          <InteractiveMarkdown
+            content={thread.body}
+            sourceId="thread"
+            checkedMap={checkedTasks}
+            onToggle={handleTaskToggle}
+            disabled={submittedFor.has('thread')}
+          />
+          <SelectionBar sourceId="thread" sourceBody={thread.body} parentId={null} />
         </div>
       </div>
 

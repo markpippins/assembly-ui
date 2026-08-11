@@ -472,7 +472,12 @@ class StorageService {
         thread.lastReplyAt = newComment.createdAt;
         thread.lastReplyAuthor = user.name;
       }
-      api.addComment(threadId, data).catch(() => {});
+      // The server requires postedById — inject the resolved user so live
+      // comments actually persist (previously every live-mode post 400'd and
+      // the error was swallowed, leaving only the optimistic cache entry).
+      api.addComment(threadId, { ...data, postedById: data.postedById ?? user.id }).catch((err) => {
+        console.error('[assembly-ui] addComment failed to persist:', err);
+      });
       return newComment;
     }
     const s = this.loadState();

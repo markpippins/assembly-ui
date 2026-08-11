@@ -25,6 +25,16 @@ export function renderMarkdown(content: string): string {
     return `<pre class="bg-gray-900 text-gray-100 rounded p-3 overflow-x-auto text-sm my-2"><code>${code.trim()}</code></pre>`;
   });
 
+  // Protect <pre> blocks from the line-oriented transforms below (headers,
+  // bold/italic, links, bullets, task lists) so fenced code renders verbatim.
+  // Restored just before paragraph splitting.
+  const preBlocks: string[] = [];
+  html = html.replace(/<pre[^>]*>[\s\S]*?<\/pre>/g, (m) => {
+    const idx = preBlocks.length;
+    preBlocks.push(m);
+    return `\u0000PRE${idx}\u0000`;
+  });
+
   // Inline code
   html = html.replace(/`([^`]+)`/g, '<code class="bg-gray-100 text-primary-700 px-1 py-0.5 rounded text-sm font-mono">$1</code>');
 
@@ -40,11 +50,29 @@ export function renderMarkdown(content: string): string {
   // Links
   html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-primary-700 hover:underline" target="_blank" rel="noopener noreferrer">$1</a>');
 
+  // Task lists (- [ ] / - [x]) — must run before the unordered-list regex below.
+  // Rendered as static (disabled) checkboxes so existing content shows correctly;
+  // interactive selection with submit-as-reply is provided by <InteractiveMarkdown>.
+  html = html.replace(/^(\s*)[-*]\s+\[([ xX])\][ \t]*(.*)$/gim, (_, indent, mark, text) => {
+    const checked = mark.toLowerCase() === 'x';
+    return (
+      `${indent}<label class="task-row flex items-start gap-2 my-0.5 cursor-default">` +
+      `<input type="checkbox" class="mt-0.5 h-3.5 w-3.5 accent-primary-600"${checked ? ' checked' : ''} disabled />` +
+      `<span class="text-sm ${checked ? 'text-gray-400 dark:text-steel-500 line-through' : 'text-gray-800 dark:text-steel-100'}">${text}</span>` +
+      `</label>`
+    );
+  });
+
   // Unordered lists
   html = html.replace(/^(\s*)[-*] (.*$)/gim, '$1• $2');
 
   // Blockquotes
   html = html.replace(/^> (.*$)/gim, '<blockquote class="border-l-2 border-primary-300 pl-3 italic text-gray-600 my-2">$1</blockquote>');
+
+  // Restore protected code blocks (after all line-oriented transforms).
+  if (preBlocks.length) {
+    html = html.replace(/\u0000PRE(\d+)\u0000/g, (_, i) => preBlocks[Number(i)]);
+  }
 
   // Paragraphs - split on blank lines and wrap
   const blocks = html.split(/\n\n+/).map((block) => {
@@ -53,10 +81,28 @@ export function renderMarkdown(content: string): string {
     if (trimmed.startsWith('<') && (trimmed.startsWith('<pre') || trimmed.startsWith('<h') || trimmed.startsWith('<blockquote'))) {
       return trimmed;
     }
+    if (trimmed.startsWith('<label class="task-row')) {
+      // Task-list block: keep as-is (no <p> wrapper) unless it mixes non-task content.
+      const taskOnly = trimmed.split('\n').every((l) => !l.trim() || l.trim().startsWith('<label class="task-row'));
+      if (taskOnly) return trimmed;
+    }
     return `<p class="text-sm text-gray-700 leading-relaxed mb-2">${trimmed.replace(/\n/g, '<br>')}</p>`;
   });
 
   return blocks.join('\n');
+}
+
+/**
+ * Inline-only markdown transforms (code, bold/italic, links) used to render
+ * individual task-list item text without paragraph or list wrappers.
+ */
+export function renderInlineMarkdown(text: string): string {
+  let html = escapeHtml(text);
+  html = html.replace(/`([^`]+)`/g, '<code class="bg-gray-100 text-primary-700 px-1 py-0.5 rounded text-sm font-mono">$1</code>');
+  html = html.replace(/\*\*([^*]+)\*\*/g, '<strong class="font-semibold text-gray-900">$1</strong>');
+  html = html.replace(/\*([^*]+)\*/g, '<em class="italic text-gray-700">$1</em>');
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-primary-700 hover:underline" target="_blank" rel="noopener noreferrer">$1</a>');
+  return html;
 }
 
 interface MarkdownRendererProps {
