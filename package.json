@@ -8,7 +8,7 @@
     "build": "vite build",
     "start": "node server.js",
     "typecheck": "tsc --noEmit",
-    "test": "node tests/comment-persistence.mjs"
+    "test": "tsc --noEmit && node tests/comment-persistence.mjs"
   },
   "dependencies": {
     "autoprefixer": "^10.4.0",
