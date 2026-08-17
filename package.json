@@ -6,9 +6,9 @@
   "scripts": {
     "dev": "node dev.js",
     "build": "vite build",
-    "start": "node server.js",
+    "start": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test": "tsc --noEmit && node tests/comment-persistence.mjs"
+    "test": "tsc --noEmit && node tests/comment-persistence.mjs && node tests/decision-cards.mjs"
   },
   "dependencies": {
     "autoprefixer": "^10.4.0",

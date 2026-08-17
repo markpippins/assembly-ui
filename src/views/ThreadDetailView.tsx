@@ -17,6 +17,10 @@ export const ThreadDetailView: React.FC = () => {
   const [replyingToId, setReplyingToId] = useState<string | null>(null);
   // Interactive task-list agreement state: checkedMap keyed `${sourceId}:${blockIdx}:${itemIdx}`.
   const [checkedTasks, setCheckedTasks] = useState<Record<string, boolean>>({});
+  // Single-choice (radio) state: `${sourceId}:${blockIdx}` -> selected itemIdx.
+  const [radioTasks, setRadioTasks] = useState<Record<string, number>>({});
+  // "Other" free-text state: `other:${sourceId}:${blockIdx}:${itemIdx}` -> typed text.
+  const [otherTexts, setOtherTexts] = useState<Record<string, string>>({});
   // sourceIds ('thread' or comment id) that already submitted an agreement reply.
   const [submittedFor, setSubmittedFor] = useState<Set<string>>(new Set());
   const { showToast } = useToast();
@@ -29,13 +33,12 @@ export const ThreadDetailView: React.FC = () => {
     const res = dataService.getThread(threadId);
     if (res.thread) setThread(res.thread);
     if (res.comments.length) setComments(res.comments);
-    // In live mode the API fetch resolves asynchronously into the cache after this
+    // The API fetch resolves asynchronously into the cache after this
     // synchronous read — re-read shortly after so cold deep-links render too.
-    // Always re-check in live mode because comments are loaded async via api.fetchThread()
+    // Always re-check because comments are loaded async via api.fetchThread()
     // which populates the cache after the initial synchronous return.
-    const isLiveMode = (import.meta.env.ASSEMBLY_MODE || 'mock') === 'live';
-    if (isLiveMode && !res.comments.length) {
-      // In live mode, if comments are empty, keep checking until they load (with safety limit)
+    if (!res.comments.length) {
+      // If comments are empty, keep checking until they load (with safety limit)
       let attempts = 0;
       const maxAttempts = 10;
       const checkComments = () => {
@@ -49,13 +52,6 @@ export const ThreadDetailView: React.FC = () => {
         }
       };
       window.setTimeout(checkComments, 300);
-    } else if (!res.thread && !res.comments.length) {
-      // In mock mode, only re-check if both are empty
-      window.setTimeout(() => {
-        const r2 = dataService.getThread(threadId);
-        if (r2.thread) setThread(r2.thread);
-        if (r2.comments.length) setComments(r2.comments);
-      }, 900);
     }
   };
 
@@ -88,8 +84,19 @@ export const ThreadDetailView: React.FC = () => {
     });
   };
 
+  const handleRadioToggle = (sourceId: string, blockIdx: number, itemIdx: number) => {
+    setRadioTasks((prev) => ({ ...prev, [`${sourceId}:${blockIdx}`]: itemIdx }));
+  };
+
+  const handleOtherChange = (sourceId: string, blockIdx: number, itemIdx: number, value: string) => {
+    setOtherTexts((prev) => ({ ...prev, [`other:${sourceId}:${blockIdx}:${itemIdx}`]: value }));
+  };
+
   const countCheckedFor = (sourceId: string) =>
     Object.keys(checkedTasks).filter((k) => k.startsWith(`${sourceId}:`)).length;
+
+  const countRadioFor = (sourceId: string) =>
+    Object.keys(radioTasks).filter((k) => k.startsWith(`${sourceId}:`)).length;
 
   const clearSource = (sourceId: string) => {
     setCheckedTasks((prev) => {
@@ -99,11 +106,25 @@ export const ThreadDetailView: React.FC = () => {
       });
       return next;
     });
+    setRadioTasks((prev) => {
+      const next = { ...prev };
+      Object.keys(next).forEach((k) => {
+        if (k.startsWith(`${sourceId}:`)) delete next[k];
+      });
+      return next;
+    });
+    setOtherTexts((prev) => {
+      const next = { ...prev };
+      Object.keys(next).forEach((k) => {
+        if (k.startsWith(`other:${sourceId}:`)) delete next[k];
+      });
+      return next;
+    });
   };
 
   const handleSubmitSelection = (sourceId: string, sourceBody: string, parentId: string | null) => {
     if (!threadId) return;
-    const body = buildSelectionBody(sourceBody, sourceId, checkedTasks);
+    const body = buildSelectionBody(sourceBody, sourceId, checkedTasks, radioTasks, otherTexts);
     dataService.addComment(threadId, { body, parentId });
     clearSource(sourceId);
     setSubmittedFor((prev) => new Set(prev).add(sourceId));
@@ -126,11 +147,15 @@ export const ThreadDetailView: React.FC = () => {
       );
     }
     const count = countCheckedFor(sourceId);
-    if (count === 0) return null;
+    const radioCount = countRadioFor(sourceId);
+    if (count + radioCount === 0) return null;
+    const label = radioCount > 0
+      ? `Selections ready (${count + radioCount})`
+      : `Agreed items (${count})`;
     return (
-      <div className="mt-2 flex items-center justify-between gap-3 rounded-lg border border-primary-500/30 bg-primary-50 dark:bg-primary-950/40 px-3 py-2">
+      <div className="mt-2 flex items-center justify-between gap-3 border border-primary-500/30 bg-primary-50 dark:bg-primary-950/40 px-3 py-2">
         <span className="text-xs font-medium text-primary-700 dark:text-primary-300">
-          Agreed items ({count})
+          {label}
         </span>
         <div className="flex items-center gap-2">
           <button
@@ -177,6 +202,10 @@ export const ThreadDetailView: React.FC = () => {
           sourceId={comment.id}
           checkedMap={checkedTasks}
           onToggle={handleTaskToggle}
+          radioMap={radioTasks}
+          onRadio={handleRadioToggle}
+          otherMap={otherTexts}
+          onOtherChange={handleOtherChange}
           disabled={submittedFor.has(comment.id) || isAgreementReply}
         />
         {!isAgreementReply && (
@@ -264,6 +293,10 @@ export const ThreadDetailView: React.FC = () => {
             sourceId="thread"
             checkedMap={checkedTasks}
             onToggle={handleTaskToggle}
+            radioMap={radioTasks}
+            onRadio={handleRadioToggle}
+            otherMap={otherTexts}
+            onOtherChange={handleOtherChange}
             disabled={submittedFor.has('thread')}
           />
           <SelectionBar sourceId="thread" sourceBody={thread.body} parentId={null} />
