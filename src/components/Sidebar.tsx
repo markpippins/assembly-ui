@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
   Rss, MessageSquare, HelpCircle, MessagesSquare, CheckSquare, ListOrdered,
-  FileCheck, Shield, Users, Sprout, GitBranch, Eye, BarChart3, Bot, FileCode,
+  FileCheck, Shield, Users, Sprout, Eye, BarChart3, Bot, FileCode,
   Calendar, CheckCircle2, Settings, Search as SearchIcon, Clock, FileText
 } from 'lucide-react';
 import { dataService } from '../services/dataService';
@@ -23,7 +23,6 @@ export const Sidebar: React.FC = () => {
     candidates: 0,
     harvests: 0,
     openQuestions: 0,
-    intents: 0,
     assessments: 0,
     observations: 0,
     agentRecords: 0,
@@ -66,7 +65,6 @@ export const Sidebar: React.FC = () => {
         { label: 'Work Requests', path: '/work-requests', icon: Shield, badge: counts.workRequests },
         { label: 'Candidates', path: '/candidates', icon: Users, badge: counts.candidates },
         { label: 'Harvests', path: '/harvests', icon: Sprout, badge: counts.harvests },
-        { label: 'Intents', path: '/intents', icon: GitBranch, badge: counts.intents },
       ],
     },
     {

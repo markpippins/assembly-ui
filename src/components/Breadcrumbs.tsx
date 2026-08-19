@@ -14,7 +14,6 @@ const ROUTE_NAME_MAP: Record<string, string> = {
   harvests: 'Harvested Intelligence',
   conversations: 'Conversations',
   resolutions: 'Resolutions',
-  intents: 'Intents',
   assessments: 'Assessments',
   observations: 'Observations',
   'agent-records': 'Agent Execution Records',

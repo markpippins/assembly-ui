@@ -32,7 +32,6 @@ const ConversationsView = lazy(() => import('./views/ConversationsView').then(m 
 const OpenQuestionsView = lazy(() => import('./views/OpenQuestionsView').then(m => ({ default: m.OpenQuestionsView })));
 const OpenQuestionDetailView = lazy(() => import('./views/OpenQuestionDetailView').then(m => ({ default: m.OpenQuestionDetailView })));
 const ResolutionsView = lazy(() => import('./views/ResolutionsView').then(m => ({ default: m.ResolutionsView })));
-const IntentsView = lazy(() => import('./views/IntentsView').then(m => ({ default: m.IntentsView })));
 const AssessmentsView = lazy(() => import('./views/AssessmentsView').then(m => ({ default: m.AssessmentsView })));
 const ObservationsView = lazy(() => import('./views/ObservationsView').then(m => ({ default: m.ObservationsView })));
 const AgentRecordsView = lazy(() => import('./views/AgentRecordsView').then(m => ({ default: m.AgentRecordsView })));
@@ -121,10 +120,6 @@ function AnimatedRoutes() {
             {/* Resolutions */}
             <Route path="/resolutions" element={<ResolutionsView />} />
 
-            {/* Intents */}
-            <Route path="/intents" element={<IntentsView />} />
-            <Route path="/intents/:id" element={<EntityDetailView />} />
-
             {/* Assessments */}
             <Route path="/assessments" element={<AssessmentsView />} />
             <Route path="/assessments/:id" element={<EntityDetailView />} />
@@ -170,17 +165,12 @@ function AnimatedRoutes() {
 }
 
 // ── Health banner (T-Assembly-UI-03) ─────────────────────────────────
-// Polls /api/health every 15 s in live mode. In mock mode the poller is
-// suppressed (mock is always healthy by construction).
+// Polls /api/health every 15 s against the live backend.
 function HealthBanner() {
   const [unhealthy, setUnhealthy] = useState(false);
   const [checking, setChecking] = useState(false);
 
   useEffect(() => {
-    // Only poll in live mode. In mock mode, the UI is always healthy.
-    const mode = import.meta.env.ASSEMBLY_MODE || 'mock';
-    if (mode !== 'live') return;
-
     let mounted = true;
 
     async function check() {

@@ -1,5 +1,5 @@
 // apiClient.ts — thin fetch wrappers for all Assembly API routes.
-// Used by dataService in live mode. Mock mode uses localStorage (unchanged).
+// Used by dataService for all reads/writes against the live backends.
 //
 // All list endpoints return the canonical nebula-srv envelope shape:
 //   { items: T[], total: number, page: number, pageSize: number }
@@ -135,7 +135,6 @@ const COLLECTIONS = [
   'agendas',
   'candidates',
   'harvests',
-  'intents',
   'assessments',
   'observations',
   'agent-records',
@@ -146,7 +145,11 @@ const COLLECTIONS = [
 export type CollectionName = typeof COLLECTIONS[number];
 
 export async function fetchCollection(name: CollectionName): Promise<any[]> {
-  return listAll(`/${name}`);
+  // The agent-records list projection omits `content` by default (payload
+  // size); the Agent Records / Reports views render record bodies in the
+  // list, so opt in. (nebula-srv GET /api/agent-records?includeContent=true)
+  const params = name === 'agent-records' ? { includeContent: 'true' } : undefined;
+  return listAll(`/${name}`, params);
 }
 
 export async function fetchCollectionItem(name: CollectionName, id: string): Promise<any | null> {
@@ -296,7 +299,6 @@ export async function loadAllData(): Promise<Record<string, any>> {
     conversations,
     openQuestions,
     resolvedOpenQuestions,
-    intents,
     assessments,
     observations,
     agentRecords,
@@ -316,7 +318,6 @@ export async function loadAllData(): Promise<Record<string, any>> {
     safe(fetchConversations(), 'conversations'),
     safe(fetchOpenQuestions(), 'open-questions'),
     safe(fetchResolvedQuestions(), 'open-questions-resolved'),
-    safe(fetchCollection('intents'), 'intents'),
     safe(fetchCollection('assessments'), 'assessments'),
     safe(fetchCollection('observations'), 'observations'),
     safe(fetchCollection('agent-records'), 'agent-records'),
@@ -344,7 +345,7 @@ export async function loadAllData(): Promise<Record<string, any>> {
 
   return {
     forums, feed, workRequests, requirements, agendas, candidates,
-    harvests, conversations, openQuestions, resolvedOpenQuestions, intents,
+    harvests, conversations, openQuestions, resolvedOpenQuestions,
     assessments, observations, agentRecords, specifications, plans, specs,
     users, counts,
     _threadsBySlug: threadsBySlug,

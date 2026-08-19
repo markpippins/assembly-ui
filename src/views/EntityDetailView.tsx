@@ -15,7 +15,6 @@ const ENTITY_ROUTE_MAP: Record<string, string> = {
   candidate: 'candidates',
   harvest: 'harvests',
   conversation: 'conversations',
-  intent_record: 'intents',
   assessment: 'assessments',
   observation: 'observations',
   report: 'reports',
@@ -351,9 +350,6 @@ export const EntityDetailView: React.FC = () => {
     } else if (path.includes('/conversations')) {
       data = dataService.getConversation(id);
       type = 'Conversation';
-    } else if (path.includes('/intents')) {
-      data = dataService.getIntent(id);
-      type = 'Intent';
     } else if (path.includes('/assessments')) {
       data = dataService.getAssessment(id);
       type = 'Assessment';

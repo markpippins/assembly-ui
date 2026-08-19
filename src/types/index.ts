@@ -213,20 +213,6 @@ export interface TimelineEvent {
   icon: 'Circle' | 'CheckCircle2' | 'RefreshCw' | 'FileText';
 }
 
-export interface IntentRecord {
-  id: string;
-  candidateId: string | null;
-  parentId: string | null;
-  title: string | null;
-  description: string | null;
-  sourceType: string | null;
-  sourceRef: string | null;
-  tags: string[] | null;
-  status: string | null;
-  metadata: Record<string, unknown> | null;
-  createdAt: string;
-  updatedAt: string;
-}
 
 export interface Assessment {
   id: string;
@@ -330,7 +316,6 @@ export interface Counts {
   candidates: number;
   harvests: number;
   openQuestions: number;
-  intents: number;
   assessments: number;
   observations: number;
   agentRecords: number;
