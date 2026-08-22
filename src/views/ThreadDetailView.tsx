@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Send, CornerDownRight, CheckCircle2 } from 'lucide-react';
+import { Send, CornerDownRight, CheckCircle2, Pencil, Trash2 } from 'lucide-react';
 import { Avatar } from '../components/Avatar';
 import { TTSButton } from '../components/TTSButton';
 import { InteractiveMarkdown, buildSelectionBody } from '../components/InteractiveMarkdown';
@@ -18,6 +18,9 @@ export const ThreadDetailView: React.FC = () => {
  const [comments, setComments] = useState<Comment[]>([]);
  const [replyText, setReplyText] = useState('');
  const [replyingToId, setReplyingToId] = useState<string | null>(null);
+ // Inline comment editing: which comment is being edited + its draft body.
+ const [editingId, setEditingId] = useState<string | null>(null);
+ const [editText, setEditText] = useState('');
  // Interactive task-list agreement state: checkedMap keyed `${sourceId}:${blockIdx}:${itemIdx}`.
  const [checkedTasks, setCheckedTasks] = useState<Record<string, boolean>>({});
  // Single-choice (radio) state: `${sourceId}:${blockIdx}` -> selected itemIdx.
@@ -79,6 +82,36 @@ export const ThreadDetailView: React.FC = () => {
  setReplyText('');
  setReplyingToId(null);
  showToast('Reply added successfully!', 'success');
+ loadData();
+ };
+
+ // ── Comment edit / delete ─────────────────────────────────────────
+ const handleStartEdit = (comment: Comment) => {
+ setReplyingToId(null);
+ setEditingId(comment.id);
+ setEditText(comment.body);
+ };
+
+ const handleSaveEdit = () => {
+ if (!threadId || !editingId || !editText.trim()) return;
+ dataService.updateComment(threadId, editingId, editText.trim());
+ setEditingId(null);
+ setEditText('');
+ showToast('Comment updated', 'success');
+ loadData();
+ };
+
+ const handleCancelEdit = () => {
+ setEditingId(null);
+ setEditText('');
+ };
+
+ const handleDeleteComment = (comment: Comment) => {
+ if (!threadId) return;
+ if (!window.confirm('Delete this comment? Its direct replies are removed too.')) return;
+ dataService.deleteComment(threadId, comment.id);
+ if (replyingToId === comment.id) setReplyingToId(null);
+ showToast('Comment deleted', 'info');
  loadData();
  };
 
@@ -205,6 +238,40 @@ export const ThreadDetailView: React.FC = () => {
  </div>
  </div>
  <div className={`mt-1 ${nested ? 'ml-7' : 'ml-9'}`}>
+ {editingId === comment.id ? (
+ /* Inline edit form — replaces the rendered body while editing. */
+ <form
+ onSubmit={(e) => { e.preventDefault(); handleSaveEdit(); }}
+ className="space-y-1.5"
+ >
+ <label htmlFor={`edit-${comment.id}`} className="sr-only">Edit comment</label>
+ <textarea
+ id={`edit-${comment.id}`}
+ autoFocus
+ value={editText}
+ onChange={(e) => setEditText(e.target.value)}
+ rows={16}
+ className="w-full resize-y bg-white border border-primary-300 rounded-lg p-2.5 text-sm text-steel-900 focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20"
+ />
+ <div className="flex justify-end gap-2">
+ <button
+ type="button"
+ onClick={handleCancelEdit}
+ className="px-3 py-1 text-xs text-gray-500 hover:text-gray-800 transition-colors"
+ >
+ Cancel
+ </button>
+ <button
+ type="submit"
+ disabled={!editText.trim()}
+ className="app-btn-primary px-3 py-1 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+ >
+ Save changes
+ </button>
+ </div>
+ </form>
+ ) : (
+ <>
  <InteractiveMarkdown
  content={comment.body}
  sourceId={comment.id}
@@ -219,13 +286,36 @@ export const ThreadDetailView: React.FC = () => {
  {!isAgreementReply && (
  <SelectionBar sourceId={comment.id} sourceBody={comment.body} parentId={comment.id} />
  )}
+ </>
+ )}
+ {/* Comment actions: reply / edit / delete. Agreement replies are
+     durable records — editable never, deletable always. */}
+ <div className="mt-1.5 flex items-center gap-3">
  <button
  onClick={() => setReplyingToId(replyingToId === comment.id ? null : comment.id)}
- className="mt-1.5 inline-flex items-center gap-1 text-[11px] text-gray-500 hover:text-primary-600 :text-primary-300 transition-colors"
+ className="inline-flex items-center gap-1 text-[11px] text-gray-500 hover:text-primary-600 :text-primary-300 transition-colors"
  >
  <CornerDownRight className="w-3 h-3" />
  Reply
  </button>
+ {!isAgreementReply && (
+ <button
+ onClick={() => handleStartEdit(comment)}
+ className="inline-flex items-center gap-1 text-[11px] text-gray-500 hover:text-primary-600 :text-primary-300 transition-colors"
+ >
+ <Pencil className="w-3 h-3" />
+ Edit
+ </button>
+ )}
+ <button
+ onClick={() => handleDeleteComment(comment)}
+ title="Delete comment"
+ className="inline-flex items-center gap-1 text-[11px] text-gray-500 hover:text-red-600 transition-colors"
+ >
+ <Trash2 className="w-3 h-3" />
+ Delete
+ </button>
+ </div>
  </div>
  {replyingToId === comment.id && (
  <form onSubmit={(e) => handlePostComment(e, comment.id)} className={`mt-2 space-y-2 ${nested ? 'ml-7' : 'ml-9'}`}>
@@ -235,8 +325,8 @@ export const ThreadDetailView: React.FC = () => {
  value={replyText}
  onChange={(e) => setReplyText(e.target.value)}
  placeholder={`Replying to ${comment.author.name}...`}
- rows={2}
- className="w-full bg-white border border-steel-200 rounded-lg p-2.5 text-sm text-steel-900 placeholder-steel-400 focus:outline-none focus:border-primary-500 resize-none"
+ rows={16}
+ className="w-full bg-white border border-steel-200 rounded-lg p-2.5 text-sm text-steel-900 placeholder-steel-400 focus:outline-none focus:border-primary-500 resize-y"
  />
  <div className="flex justify-end gap-2">
  <button
@@ -345,8 +435,8 @@ export const ThreadDetailView: React.FC = () => {
  setReplyText(e.target.value);
  }}
  placeholder="Write your constructive response..."
- rows={2}
- className="w-full resize-none rounded border border-steel-200 p-2 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500 outline-none bg-white text-steel-800"
+ rows={16}
+ className="w-full resize-y rounded border border-steel-200 p-2 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500 outline-none bg-white text-steel-800"
  />
  <div className="flex items-center justify-end gap-2 mt-2">
  <button

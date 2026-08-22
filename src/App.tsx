@@ -256,7 +256,7 @@ export function App() {
  <SearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
  <div className="flex-1 flex min-h-0 overflow-hidden">
  <Sidebar />
- <main className="flex-1 min-w-0 overflow-y-auto pb-12 bg-slate-50 transition-colors">
+ <main className="flex-1 min-w-0 overflow-y-auto overscroll-contain pb-12 bg-slate-50 transition-colors">
  <Breadcrumbs />
  <AnimatedRoutes />
  </main>

@@ -86,7 +86,7 @@ export const Sidebar: React.FC = () => {
   ];
 
   return (
-    <aside className="w-60 bg-[#0f172a] text-slate-400 border-r border-slate-800 flex flex-col h-[calc(100vh-3.5rem)] overflow-y-auto shrink-0 py-3 px-2 transition-colors">
+    <aside className="w-60 bg-[#0f172a] text-slate-400 border-r border-slate-800 flex flex-col h-[calc(100vh-3.5rem)] overflow-y-auto overscroll-contain shrink-0 py-3 px-2 transition-colors">
       <div className="space-y-1">
         {sections.map((section, sIdx) => (
           <React.Fragment key={sIdx}>

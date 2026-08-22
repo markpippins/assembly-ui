@@ -454,6 +454,44 @@ class DataService {
     return true;
   }
 
+  // ── Comment edit / delete ─────────────────────────────────────────
+  // Optimistic cache updates + fire-and-forget persistence, matching the
+  // create path convention. Delete also removes direct replies (one nesting
+  // level rendered by views) and trims the cached thread's replyCount.
+  updateComment(threadId: string, commentId: string, body: string): boolean {
+    if (!liveCache || !body.trim()) return false;
+    const list = (liveCache as any)['_comments_' + threadId];
+    if (Array.isArray(list)) {
+      const c = list.find((x: any) => x?.id === commentId);
+      if (c) c.body = body;
+    }
+    api.updateComment(commentId, body).catch((err) => {
+      console.error('[assembly-ui] updateComment failed:', err);
+    });
+    emitChange();
+    return true;
+  }
+
+  deleteComment(threadId: string, commentId: string): boolean {
+    if (!liveCache) return false;
+    const cacheKey = '_comments_' + threadId;
+    const list = (liveCache as any)[cacheKey];
+    if (Array.isArray(list)) {
+      (liveCache as any)[cacheKey] = list.filter(
+        (c: any) => c?.id !== commentId && c?.parentId !== commentId
+      );
+    }
+    const detail = (liveCache as any)?.['_threadDetail_' + threadId];
+    if (detail && typeof detail.replyCount === 'number' && detail.replyCount > 0) {
+      detail.replyCount -= 1;
+    }
+    api.deleteComment(commentId).catch((err) => {
+      console.error('[assembly-ui] deleteComment failed:', err);
+    });
+    emitChange();
+    return true;
+  }
+
   // ── Feed ──────────────────────────────────────────────────────────
   getFeed(): FeedPost[] {
     return liveList('feed');

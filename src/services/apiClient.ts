@@ -138,6 +138,19 @@ export async function addComment(threadId: string, data: { body: string; postedB
   });
 }
 
+// PUT /api/forums/comments/:id — edit a comment body.
+export async function updateComment(commentId: string, body: string) {
+  return request<any>(listUrl(`/forums/comments/${commentId}`), {
+    method: 'PUT',
+    body: JSON.stringify({ body }),
+  });
+}
+
+// DELETE /api/forums/comments/:id — soft-delete (expiration-based) a comment.
+export async function deleteComment(commentId: string) {
+  return request<any>(listUrl(`/forums/comments/${commentId}`), { method: 'DELETE' });
+}
+
 // ── Feed ─────────────────────────────────────────────────────────────
 export async function fetchFeed() {
   const result = await request<any[] | ListEnvelope<any>>(listUrl('/feed'));
