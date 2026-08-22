@@ -27,6 +27,37 @@ export interface Thread {
   viewCount: number;
   lastReplyAt: string | null;
   lastReplyAuthor: string | null;
+  /** Colored status indicator (posts.rating on the root post). Absent = Posted. */
+  statusRating?: number;
+}
+
+// ── Thread status vocabulary (assembly.posts.rating) ────────────────
+// Canonical mapping shared with assembly-srv routes/forums.js and the
+// backfill script — keep all three in sync.
+export type ThreadStatus = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
+
+export interface ThreadStatusMeta {
+  value: ThreadStatus;
+  label: string;
+  /** Tailwind background class for bar / LED indicators. */
+  color: string;
+}
+
+export const THREAD_STATUSES: Record<ThreadStatus, ThreadStatusMeta> = {
+  0: { value: 0, label: 'Posted', color: 'bg-slate-300' },
+  1: { value: 1, label: 'Specified', color: 'bg-blue-500' },
+  2: { value: 2, label: 'Planned', color: 'bg-yellow-400' },
+  3: { value: 3, label: 'Implemented', color: 'bg-orange-500' },
+  4: { value: 4, label: 'Accepted', color: 'bg-green-500' },
+  5: { value: 5, label: 'Rejected', color: 'bg-red-500' },
+  6: { value: 6, label: 'Reopened', color: 'bg-purple-500' },
+  7: { value: 7, label: 'Closed', color: 'bg-gray-500' },
+};
+
+export const THREAD_STATUS_LIST: ThreadStatusMeta[] = Object.values(THREAD_STATUSES);
+
+export function statusMeta(value?: number | null): ThreadStatusMeta {
+  return THREAD_STATUSES[(value ?? 0) as ThreadStatus] ?? THREAD_STATUSES[0];
 }
 
 export interface Comment {

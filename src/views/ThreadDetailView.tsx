@@ -6,9 +6,10 @@ import { TTSButton } from '../components/TTSButton';
 import { InteractiveMarkdown, buildSelectionBody } from '../components/InteractiveMarkdown';
 import { dataService } from '../services/dataService';
 import { useLiveData } from '../context/LiveDataContext';
+import { StatusIndicator } from '../components/StatusIndicator';
 import { formatDateTime } from '../utils/format';
 import { useToast } from '../context/ToastContext';
-import { Thread, Comment } from '../types';
+import { Thread, Comment, THREAD_STATUS_LIST, statusMeta } from '../types';
 
 export const ThreadDetailView: React.FC = () => {
  const { version } = useLiveData();
@@ -284,9 +285,31 @@ export const ThreadDetailView: React.FC = () => {
  {/* Main Thread Card (document) */}
  <div className="app-panel p-4 mb-4">
  <div className="flex items-start justify-between gap-4">
- <h1 className="text-lg font-bold text-gray-900 ">{thread.title}</h1>
+ <div className="flex items-center gap-2 min-w-0">
+ {/* Status indicator: colored LED + selector. Any commenter may
+     advance the thread status; changes persist via PUT /status and
+     update every cached copy through dataService. */}
+ <span className="shrink-0 inline-flex items-center gap-1.5">
+ <StatusIndicator status={thread.statusRating} variant="led" showDefault />
+ <select
+ value={statusMeta(thread.statusRating).value}
+ onChange={(e) => {
+ const rating = Number(e.target.value);
+ setThread((prev) => (prev ? { ...prev, statusRating: rating } : prev));
+ dataService.setThreadStatus(thread.id, rating);
+ }}
+ title="Thread status (any commenter may update)"
+ className="text-xs font-medium text-slate-600 bg-transparent border border-slate-200 rounded-md px-1.5 py-0.5 hover:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer transition-colors"
+ >
+ {THREAD_STATUS_LIST.map((s) => (
+ <option key={s.value} value={s.value}>{s.label}</option>
+ ))}
+ </select>
+ </span>
+ </div>
  <TTSButton text={`${thread.title}. ${thread.body}`} label="Read Thread" />
  </div>
+ <h1 className="text-lg font-bold text-gray-900 mt-2">{thread.title}</h1>
  <div className="flex items-center gap-2 mt-3">
  <Avatar name={thread.author.name} avatar={thread.author.avatar} size="md" />
  <div className="text-xs text-gray-500 ">

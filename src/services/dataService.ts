@@ -432,6 +432,28 @@ class DataService {
     return newComment;
   }
 
+  // ── Thread status indicator ───────────────────────────────────────
+  // Optimistically update every cached copy of the thread (detail + any
+  // per-forum list), persist via PUT /status, then notify so mounted
+  // views re-read. Any commenter may advance the status.
+  setThreadStatus(threadId: string, rating: number): boolean {
+    if (!liveCache) return false;
+    const detail = (liveCache as any)['_threadDetail_' + threadId];
+    if (detail) detail.statusRating = rating;
+    for (const key of Object.keys(liveCache)) {
+      if (!key.startsWith('_threads_')) continue;
+      const list = (liveCache as any)[key];
+      if (!Array.isArray(list)) continue;
+      const entry = list.find((t: any) => t?.id === threadId);
+      if (entry) entry.statusRating = rating;
+    }
+    api.setThreadStatus(threadId, rating).catch((err) => {
+      console.error('[assembly-ui] setThreadStatus failed:', err);
+    });
+    emitChange();
+    return true;
+  }
+
   // ── Feed ──────────────────────────────────────────────────────────
   getFeed(): FeedPost[] {
     return liveList('feed');

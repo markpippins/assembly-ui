@@ -6,6 +6,8 @@ import { Avatar } from '../components/Avatar';
 import { EmptyState } from '../components/EmptyState';
 import { dataService } from '../services/dataService';
 import { useLiveData } from '../context/LiveDataContext';
+import { StatusIndicator } from '../components/StatusIndicator';
+import { statusMeta } from '../types';
 import { formatDateTime } from '../utils/format';
 import { useToast } from '../context/ToastContext';
 import { Forum, Thread } from '../types';
@@ -110,8 +112,11 @@ export const ForumDetailView: React.FC<{ slug?: string }> = ({ slug: slugProp })
  <Link
  key={thread.id}
  to={`/forums/${slug || thread.forum.slug}/${thread.id}`}
- className="group block bg-white border border-slate-200 hover:border-indigo-500/60 :border-indigo-500/60 p-4 transition-all shadow-xs"
+ className="group relative block overflow-hidden bg-white border border-slate-200 hover:border-indigo-500/60 :border-indigo-500/60 p-4 transition-all shadow-xs"
  >
+ {/* Colored status strip along the card's top edge (hidden for
+     default 'Posted' so unstatused threads stay quiet). */}
+ <StatusIndicator status={thread.statusRating} variant="bar" />
  <div className="flex items-start justify-between gap-4">
  <div className="flex items-start gap-3">
  <Avatar name={thread.author.name} avatar={thread.author.avatar} size="md" />
@@ -130,6 +135,11 @@ export const ForumDetailView: React.FC<{ slug?: string }> = ({ slug: slugProp })
  <span>By {thread.author.name}</span>
  <span>•</span>
  <span>{formatDateTime(thread.createdAt)}</span>
+ {thread.statusRating ? (
+ <span className={`inline-flex items-center gap-1 font-semibold ${statusMeta(thread.statusRating).color.replace('bg-', 'text-')}`}>
+ • {statusMeta(thread.statusRating).label}
+ </span>
+ ) : null}
  </div>
  </div>
  </div>

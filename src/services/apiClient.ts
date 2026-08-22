@@ -122,6 +122,15 @@ export async function fetchThread(threadId: string): Promise<{ thread: any; comm
   return request(listUrl(`/forums/threads/${threadId}`));
 }
 
+// PUT /api/forums/threads/:id/status — set the colored status indicator
+// (root post rating, 0..7). Any commenter may update it.
+export async function setThreadStatus(threadId: string, rating: number) {
+  return request<any>(listUrl(`/forums/threads/${threadId}/status`), {
+    method: 'PUT',
+    body: JSON.stringify({ rating }),
+  });
+}
+
 export async function addComment(threadId: string, data: { body: string; postedById?: string; parentId?: string | null; role?: string | null; model?: string | null }) {
   return request<any>(listUrl(`/forums/threads/${threadId}/comments`), {
     method: 'POST',
