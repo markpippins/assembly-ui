@@ -1,6 +1,6 @@
 import {
   User, Forum, Thread, Comment, FeedPost, WorkRequest, Requirement, Agenda, Candidate,
-  Harvest, ConversationSnapshot, ConversationBlock, OpenQuestion, OpenQuestionAnswer,
+  Harvest, OpenQuestion, OpenQuestionAnswer,
   TimelineEvent, Assessment, Observation, AgentRecord, Specification,
   Plan, SpecItem, Counts, SearchResult
 } from '../types';
@@ -10,10 +10,55 @@ import * as api from './apiClient';
 // assembly-ui is live-only: all reads go through this in-memory cache,
 // which initDataService() pre-loads from the real backends (assembly-srv
 // via /api, nebula-srv via /nebula) before first render. Collections that
-// are expensive to pre-load (threads per forum, conversation blocks,
-// harvest details, question answers) are lazy-loaded on demand into
-// per-key caches and re-read shortly after by the views.
+// are expensive to pre-load (threads per forum, harvest details, question
+// answers) are lazy-loaded on demand into per-key caches and re-read
+// shortly after by the views.
 let liveCache: Record<string, any> | null = null;
+
+// ── Change notification ─────────────────────────────────────────────
+// Subscribers (LiveDataContext) re-render the app whenever the shared
+// liveCache is (re)populated or background-refreshed.
+type ChangeListener = () => void;
+const changeListeners = new Set<ChangeListener>();
+
+export function onDataChanged(listener: ChangeListener): () => void {
+  changeListeners.add(listener);
+  return () => { changeListeners.delete(listener); };
+}
+
+function emitChange(): void {
+  for (const listener of changeListeners) {
+    try { listener(); } catch { /* never let one subscriber break others */ }
+  }
+}
+
+// ── Lazy-cache access tracking ──────────────────────────────────────
+// Per-key lazy caches (_threadDetail_*, _comments_*, _answers_*,
+// _harvestDetail_*) are refreshed in the background only while they were
+// accessed recently — entries the user hasn't touched in a while keep
+// serving their cached value and self-heal on revisit (the getters always
+// kick off an async refetch).
+const LAZY_REFRESH_WINDOW_MS = 10 * 60 * 1000;
+const cacheAccess = new Map<string, number>();
+
+function touchCache(key: string): void {
+  cacheAccess.set(key, Date.now());
+}
+
+function recentLazyIds(prefix: string): string[] {
+  if (!liveCache) return [];
+  const cutoff = Date.now() - LAZY_REFRESH_WINDOW_MS;
+  const ids: string[] = [];
+  for (const [key, ts] of cacheAccess) {
+    if (!key.startsWith(prefix)) continue;
+    if (ts < cutoff || !(liveCache as any)[key]) {
+      cacheAccess.delete(key);
+      continue;
+    }
+    ids.push(key.slice(prefix.length));
+  }
+  return ids;
+}
 
 export async function initDataService(): Promise<void> {
   try {
@@ -34,12 +79,107 @@ export async function initDataService(): Promise<void> {
       workRequests: data.workRequests?.length,
       requirements: data.requirements?.length,
     });
+    emitChange();
   } catch (err) {
     // No mock fallback — surface the failure and let views render empty
     // states. The health banner shows the backend as unreachable.
     console.error('[dataService] Failed to load live data:', err);
     liveCache = {};
   }
+}
+
+// ── Background refresh ──────────────────────────────────────────────
+// Re-pulls live data from the backends and merges it into liveCache IN
+// PLACE, then notifies subscribers so mounted views re-read the cache.
+// Design notes:
+// - Core collections are replaced with fresh rows; optimistic local-only
+//   entries (client-created rows whose server ack hasn't landed in a poll
+//   yet) are preserved on top so user posts never blink away.
+// - Recently accessed lazy caches (open thread detail + comments, question
+//   answers, harvest details) are re-fetched BEFORE the notification fires,
+//   so the view the user is looking at swaps straight to fresh data with no
+//   empty flicker window.
+export async function refreshDataService(): Promise<boolean> {
+  if (!liveCache) {
+    await initDataService();
+    return true;
+  }
+  try {
+    const data = await api.loadAllData();
+    const cache = liveCache;
+
+    // 1. Refresh recently-viewed lazy detail caches first.
+    const lazyTasks: Promise<void>[] = [];
+    for (const id of recentLazyIds('_threadDetail_')) {
+      touchCache('_threadDetail_' + id);
+      lazyTasks.push(
+        api.fetchThread(id).then(({ thread, comments }) => {
+          if (!liveCache) return;
+          (liveCache as any)['_threadDetail_' + id] = thread;
+          (liveCache as any)['_comments_' + id] = comments || [];
+        }).catch(() => {})
+      );
+    }
+    for (const qid of recentLazyIds('_answers_')) {
+      touchCache('_answers_' + qid);
+      lazyTasks.push(
+        api.fetchQuestionAnswers(qid).then(({ answers }) => {
+          if (!liveCache) return;
+          (liveCache as any)['_answers_' + qid] = answers || [];
+        }).catch(() => {})
+      );
+    }
+    for (const hid of recentLazyIds('_harvestDetail_')) {
+      touchCache('_harvestDetail_' + hid);
+      lazyTasks.push(
+        api.fetchCollectionItem('harvests', hid).then((raw) => {
+          if (!liveCache || !raw) return;
+          (liveCache as any)['_harvestDetail_' + hid] = mapHarvestDetail(raw);
+        }).catch(() => {})
+      );
+    }
+    await Promise.all(lazyTasks);
+
+    // 2. Merge fresh core collections into the cache in place.
+    const CORE_LIST_KEYS = [
+      'forums', 'feed', 'workRequests', 'requirements', 'agendas',
+      'candidates', 'harvests', 'openQuestions', 'resolvedOpenQuestions',
+      'assessments', 'observations', 'agentRecords', 'specifications',
+      'plans', 'specs', 'users',
+    ] as const;
+    for (const key of CORE_LIST_KEYS) {
+      cache[key] = mergeList(cache[key], (data as any)[key] ?? []);
+    }
+    if (data.counts) cache.counts = data.counts;
+
+    // Per-forum thread lists ship pre-fetched with loadAllData.
+    for (const [slug, threads] of Object.entries((data as any)._threadsBySlug ?? {})) {
+      const key = '_threads_' + slug;
+      cache[key] = mergeList(cache[key], threads as any[]);
+    }
+
+    emitChange();
+    return true;
+  } catch (err) {
+    console.warn('[dataService] Background refresh failed:', err);
+    return false;
+  }
+}
+
+// Optimistic client-side ids look like `<kind>-<epoch ms>`; server ids are
+// UUIDs. Local-only entries are kept across merges until their server
+// counterpart appears (matched by id once create-acks reconcile them).
+function isLocalOnlyId(id: unknown): boolean {
+  return typeof id === 'string' && /^[a-z]+-\d{10,}$/.test(id);
+}
+
+function mergeList(existing: any[] | undefined, fresh: any[]): any[] {
+  if (!existing || existing.length === 0) return fresh;
+  const freshIds = new Set(fresh.map((f) => String(f?.id)));
+  const localOnly = existing.filter(
+    (e) => isLocalOnlyId(e?.id) && !freshIds.has(String(e.id))
+  );
+  return localOnly.length > 0 ? [...localOnly, ...fresh] : fresh;
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────
@@ -176,13 +316,19 @@ class DataService {
   }
 
   // ── Threads ───────────────────────────────────────────────────────
+  // Small forums request full bodies so the list view renders previews;
+  // large forums (transcripts, harvest-candidates, ...) request only a
+  // recent body window (bodyWindow=20) so recent posts show previews without
+  // shipping every body. The detail view fetches any body on demand.
   getThreads(slug: string): Thread[] {
     const cacheKey = '_threads_' + slug;
     const cached = (liveCache as any)?.[cacheKey];
     if (cached) return cached;
     // Lazy-load threads for this forum on first access
     (liveCache as any)[cacheKey] = [];
-    api.fetchThreads(slug).then(threads => {
+    const forum = this.getForums().find((f: Forum) => f.slug === slug);
+    const policy = forum ? api.threadBodyPolicy(forum.threadCount) : {};
+    api.fetchThreads(slug, policy).then(threads => {
       if (liveCache) (liveCache as any)[cacheKey] = threads;
     }).catch(() => {});
     return [];
@@ -208,17 +354,35 @@ class DataService {
     const cacheKey = '_threads_' + slug;
     if (!(liveCache as any)[cacheKey]) (liveCache as any)[cacheKey] = [];
     (liveCache as any)[cacheKey].unshift(newThread);
-    api.createThread(slug, { ...data, postedById: user.id, role: user.name, model: 'assembly-ui' }).catch(() => {});
+    api.createThread(slug, { ...data, postedById: user.id, role: user.name, model: 'assembly-ui' })
+      .then((created: any) => {
+        const sid = created?.id ?? created?.thread?.id;
+        if (sid) {
+          // Reconcile the optimistic row with its server identity so the
+          // next background merge dedupes it instead of duplicating it.
+          newThread.id = sid;
+        }
+      })
+      .catch(() => {});
     return newThread;
   }
 
   getThread(threadId: string): { thread: Thread | undefined; comments: Comment[] } {
-    // Try cached threads from all slug caches
-    const allCached: Thread[] = [];
-    for (const key of Object.keys(liveCache || {})) {
-      if (key.startsWith('_threads_')) allCached.push(...((liveCache as any)[key] || []));
+    // Prefer the detail cache (full body) when it exists: the per-forum list
+    // cache omits bodies (includeBody=false by default) so transcripts would
+    // otherwise render empty. Fall back to the list entry while the async
+    // detail fetch is still in flight.
+    touchCache('_threadDetail_' + threadId);
+    const detail = (liveCache as any)?.['_threadDetail_' + threadId] as Thread | undefined;
+    let thread = detail;
+    if (!thread) {
+      // Try cached threads from all slug caches
+      const allCached: Thread[] = [];
+      for (const key of Object.keys(liveCache || {})) {
+        if (key.startsWith('_threads_')) allCached.push(...((liveCache as any)[key] || []));
+      }
+      thread = allCached.find((t: Thread) => t.id === threadId);
     }
-    const thread = allCached.find((t: Thread) => t.id === threadId);
     // Lazy-load thread detail + comments from API
     api.fetchThread(threadId).then(({ thread: t, comments: c }) => {
       if (liveCache) {
@@ -228,7 +392,7 @@ class DataService {
     }).catch(() => {});
     // Return any cached comments from a previous load
     const comments: Comment[] = (liveCache as any)?.['_comments_' + threadId] ?? [];
-    return { thread: thread ?? (liveCache as any)?.['_threadDetail_' + threadId], comments };
+    return { thread, comments };
   }
 
   addComment(threadId: string, data: { body: string; postedById?: string; parentId?: string | null }): Comment {
@@ -257,9 +421,14 @@ class DataService {
     // The server requires postedById — inject the resolved user so live
     // comments actually persist. role/model are persisted by assembly-srv
     // for attribution: role is the picked user's name, model the UI.
-    api.addComment(threadId, { ...data, postedById: user.id, role: user.name, model: 'assembly-ui' }).catch((err) => {
-      console.error('[assembly-ui] addComment failed to persist:', err);
-    });
+    api.addComment(threadId, { ...data, postedById: user.id, role: user.name, model: 'assembly-ui' })
+      .then((created: any) => {
+        const sid = created?.id ?? created?.comment?.id;
+        if (sid) newComment.id = sid;
+      })
+      .catch((err) => {
+        console.error('[assembly-ui] addComment failed to persist:', err);
+      });
     return newComment;
   }
 
@@ -280,7 +449,12 @@ class DataService {
       forum: null,
     };
     liveCache!.feed.unshift(newPost);
-    api.createFeedPost({ text: data.text, postedById: user.id }).catch(() => {});
+    api.createFeedPost({ text: data.text, postedById: user.id })
+      .then((created: any) => {
+        const sid = created?.id ?? created?.post?.id;
+        if (sid) newPost.id = sid;
+      })
+      .catch(() => {});
     return newPost;
   }
 
@@ -342,6 +516,7 @@ class DataService {
     if (detail) return detail;
     const listItem = liveItem('harvests', id);
     if (!listItem) return undefined;
+    touchCache('_harvestDetail_' + id);
     api.fetchCollectionItem('harvests', id)
       .then((raw: any) => {
         if (raw && liveCache) {
@@ -357,37 +532,6 @@ class DataService {
     if (h) { h.sourceText = sourceText; h.fileSize = sourceText.length; }
     api.updateHarvest(id, { sourceText }).catch(() => {});
     return !!h;
-  }
-
-  // ── Conversations (nebula) ────────────────────────────────────────
-  getConversations(): ConversationSnapshot[] {
-    return liveList('conversations');
-  }
-
-  getConversation(id: string): ConversationSnapshot | undefined {
-    const found = liveItem('conversations', id);
-    if (found) return found;
-    // Fire-and-forget by-snapshot load (nebula-srv): `id` is a snapshot_id;
-    // the single-item route lives on nebula-srv, not assembly-srv.
-    api.fetchConversation(id).then(snap => {
-      if (snap && liveCache) {
-        const list = liveList('conversations');
-        if (!list.some((c: any) => c.id === snap.id)) {
-          (liveCache as any)['conversations'] = [snap, ...list];
-        }
-      }
-    }).catch(() => {});
-    return undefined;
-  }
-
-  getConversationBlocks(conversationId: string): ConversationBlock[] {
-    const cached = (liveCache as any)?.['_conversationBlocks_' + conversationId];
-    if (cached) return cached;
-    // Fire-and-forget load
-    api.fetchConversationBlocks(conversationId).then(blocks => {
-      if (liveCache) (liveCache as any)['_conversationBlocks_' + conversationId] = blocks;
-    }).catch(() => {});
-    return [];
   }
 
   // ── Open Questions ────────────────────────────────────────────────
@@ -438,11 +582,17 @@ class DataService {
       answerCount: 0, roleCount: 0,
     };
     liveCache!.openQuestions.unshift(newQ);
-    api.createOpenQuestion(data as Record<string, unknown>).catch(() => {});
+    api.createOpenQuestion(data as Record<string, unknown>)
+      .then((created: any) => {
+        const sid = created?.id ?? created?.question?.id;
+        if (sid) newQ.id = sid;
+      })
+      .catch(() => {});
     return newQ;
   }
 
   getQuestionAnswers(questionId: string): OpenQuestionAnswer[] {
+    touchCache('_answers_' + questionId);
     const cached = (liveCache as any)?.['_answers_' + questionId];
     if (cached) return cached;
     api.fetchQuestionAnswers(questionId).then(({ answers }) => {
@@ -464,7 +614,12 @@ class DataService {
     const cacheKey = '_answers_' + questionId;
     if (!(liveCache as any)[cacheKey]) (liveCache as any)[cacheKey] = [];
     (liveCache as any)[cacheKey].push(newAns);
-    api.addQuestionAnswer(questionId, data as Record<string, unknown>).catch(() => {});
+    api.addQuestionAnswer(questionId, data as Record<string, unknown>)
+      .then((created: any) => {
+        const sid = created?.id ?? created?.answer?.id;
+        if (sid) newAns.id = sid;
+      })
+      .catch(() => {});
     return newAns;
   }
 

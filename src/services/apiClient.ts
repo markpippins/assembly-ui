@@ -38,11 +38,10 @@ interface ListEnvelope<T> {
   pageSize: number;
 }
 
-async function listAll<T>(path: string, params?: Record<string, string>, base: string = API_BASE): Promise<T[]> {
+async function listAll<T>(path: string, params?: Record<string, string>, base: string = API_BASE, pageSize: number = 100): Promise<T[]> {
   // Fetch all pages up to a reasonable max
   const all: T[] = [];
   let page = 1;
-  const pageSize = 100;
   while (true) {
     const url = listUrl(path, { ...params, page: String(page), pageSize: String(pageSize) }, base);
     const env: ListEnvelope<T> = await request(url);
@@ -88,9 +87,28 @@ export async function reorderForums(orderedIds: string[]) {
 }
 
 // ── Threads ──────────────────────────────────────────────────────────
-export async function fetchThreads(slug: string) {
-  const result = await request<any[] | ListEnvelope<any>>(listUrl(`/forums/${slug}/threads`));
-  return Array.isArray(result) ? result : result.items ?? [];
+// The threads endpoint supports both a legacy flat array and a paginated
+// envelope ({ items, total, page, pageSize }) when page/pageSize params are
+// present. We always paginate (listAll) so large forums like transcripts
+// load in small chunks instead of one multi-hundred-MB payload; the list
+// omits full bodies by default. Body policy per forum size:
+//   - small forums (<= 100 threads): includeBody=true — full previews, cheap
+//   - large forums (transcripts, harvest-candidates, ...): bodyWindow=20 —
+//     bodies for only the 20 most-recent threads, so recent posts show
+//     previews without shipping every body
+// The detail view fetches any body on demand regardless.
+// Body policy per forum size: small forums get full bodies (cheap previews),
+// large forums get only a recent body window (recent previews, light payload).
+export function threadBodyPolicy(threadCount?: number | null): { includeBody?: boolean; bodyWindow?: number } {
+  if ((threadCount ?? 0) <= 100) return { includeBody: true };
+  return { bodyWindow: 20 };
+}
+
+export async function fetchThreads(slug: string, bodyPolicy?: { includeBody?: boolean; bodyWindow?: number }) {
+  const params: Record<string, string> = {};
+  if (bodyPolicy?.includeBody) params.includeBody = 'true';
+  if (bodyPolicy?.bodyWindow) params.bodyWindow = String(bodyPolicy.bodyWindow);
+  return listAll<any>(`/forums/${slug}/threads`, params, API_BASE, 500);
 }
 
 export async function createThread(slug: string, data: { title: string; body: string; postedById?: string; role?: string | null; model?: string | null }) {
@@ -240,38 +258,6 @@ export async function fetchSpecItem(id: string) {
   return request<any>(new URL(`/nebula/specs/${id}`, window.location.origin).toString());
 }
 
-// ── Conversations (nebula) ───────────────────────────────────────────
-// Conversation snapshots/blocks are nebula-schema tables owned by nebula-srv.
-// Reads go straight to nebula-srv through the /nebula proxy (which rewrites
-// /nebula → /api on :3101), mirroring the Angular data.service migration —
-// see Assembly Issues thread 81eadf40 for the boundary decision.
-
-export async function fetchConversations(): Promise<any[]> {
-  return listAll('/conversations', undefined, '/nebula');
-}
-
-export async function fetchConversation(id: string): Promise<any | null> {
-  try {
-    return await request(
-      new URL(`/nebula/conversations/by-snapshot/${id}`, window.location.origin).toString()
-    );
-  } catch (e: any) {
-    if (e.message?.includes('404')) return null;
-    throw e;
-  }
-}
-
-export async function fetchConversationBlocks(snapshotId: string): Promise<any[]> {
-  try {
-    const result = await request<{ blocks: any[] }>(
-      new URL(`/nebula/conversations/by-snapshot/${snapshotId}/blocks`, window.location.origin).toString()
-    );
-    return result.blocks ?? [];
-  } catch {
-    return [];
-  }
-}
-
 // ── Agenda items ────────────────────────────────────────────────────
 export async function fetchAgendaItems(agendaId: string): Promise<any[]> {
   try {
@@ -296,7 +282,6 @@ export async function loadAllData(): Promise<Record<string, any>> {
     agendas,
     candidates,
     harvests,
-    conversations,
     openQuestions,
     resolvedOpenQuestions,
     assessments,
@@ -315,7 +300,6 @@ export async function loadAllData(): Promise<Record<string, any>> {
     safe(fetchCollection('agendas'), 'agendas'),
     safe(fetchCollection('candidates'), 'candidates'),
     safe(fetchCollection('harvests'), 'harvests'),
-    safe(fetchConversations(), 'conversations'),
     safe(fetchOpenQuestions(), 'open-questions'),
     safe(fetchResolvedQuestions(), 'open-questions-resolved'),
     safe(fetchCollection('assessments'), 'assessments'),
@@ -329,11 +313,13 @@ export async function loadAllData(): Promise<Record<string, any>> {
   ]);
 
   // Pre-fetch threads for all forums so ForumDetailView doesn't show empty.
+  // Small forums request full bodies (previews); large forums request only a
+  // recent body window so the boot payload stays light.
   const threadsBySlug: Record<string, any[]> = {};
   if (Array.isArray(forums) && forums.length > 0) {
     const threadResults = await Promise.allSettled(
       forums.map((f: any) =>
-        fetchThreads(f.slug).then(t => ({ slug: f.slug, threads: t }))
+        fetchThreads(f.slug, threadBodyPolicy(f.threadCount)).then(t => ({ slug: f.slug, threads: t }))
       )
     );
     for (const r of threadResults) {
@@ -345,9 +331,33 @@ export async function loadAllData(): Promise<Record<string, any>> {
 
   return {
     forums, feed, workRequests, requirements, agendas, candidates,
-    harvests, conversations, openQuestions, resolvedOpenQuestions,
+    harvests, openQuestions, resolvedOpenQuestions,
     assessments, observations, agentRecords, specifications, plans, specs,
     users, counts,
     _threadsBySlug: threadsBySlug,
   };
+}
+
+// ── Substance segment sets (external service on port 3115) ─────────
+const SUBSTANCE_BASE = 'http://localhost:3115';
+
+export interface SegmentSet {
+  id: string;
+  name: string;
+  description: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
+export async function fetchSegmentSetsForHarvest(harvestId: string): Promise<SegmentSet[]> {
+  try {
+    const res = await fetch(`${SUBSTANCE_BASE}/segment-sets`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    const all: SegmentSet[] = Array.isArray(data) ? data : data.items || [];
+    // Filter to segment sets whose metadata.harvest_id matches
+    return all.filter((s: SegmentSet) => s.metadata?.harvest_id === harvestId);
+  } catch {
+    return [];
+  }
 }

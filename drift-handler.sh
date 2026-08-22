@@ -7,8 +7,10 @@
 # it pointed at src/types.ts and server.ts (neither exists here), the tackle-ui
 # port 4202, and it ran a destructive `git reset --hard HEAD~1`. This version is
 # corrected for the assembly-ui layout: types live in src/types/index.ts, the
-# API client is src/services/apiClient.ts, the mock-fixture server is server.js,
-# and work happens on dated dev-* branches (not directly on main).
+# API client is src/services/apiClient.ts, and work happens on dated dev-*
+# branches (not directly on main). assembly-ui is live-only — there is no
+# mock-fixture server; the Vite dev server proxies /api to assembly-srv (3107)
+# and /nebula to nebula-srv (3101).
 #
 # What this script does:
 #   1. Fetches origin and diffs the local HEAD against origin/main across the
@@ -31,8 +33,7 @@ APP_NAME="Assembly UI"
 SCHEMA_DIR="src/types"
 API_CLIENT="src/services/apiClient.ts"
 FRONTEND_DIRS="src/components src/views"
-PORT_FILE="server.js"
-TARGET_PORT="33107"
+PORT_FILE="vite.config.ts"
 AUDITOR_PAYLOAD="gais_auditor_payload.md"
 
 # Drift baseline. The upstream main branch is the contract baseline for this
@@ -78,7 +79,7 @@ and the local working branch.
 
 EOF
 
-        # 3. Backend route surface (server.js — the mock-fixture API)
+        # 3. Backend route surface (vite.config.ts — live proxy targets)
         echo "### 1. BACKEND ROUTE SURFACE CHANGES ($PORT_FILE)"
         echo '```diff'
         git diff "$BASE_BRANCH" HEAD -U5 -- "$PORT_FILE" || \
@@ -142,14 +143,11 @@ echo "Or continue on the current branch ($(git rev-parse --abbrev-ref HEAD))."
 # ------------------------------------------------------------------------------
 # 8. Port configuration hint
 #
-# server.js is the mock-fixture API and picks its port from MOCK_API_PORT
-# (default 33107); the Vite dev server uses PORT (mock → 3000). The original
-# `sed -i 's/PORT = 3000/PORT = $TARGET_PORT/g'` was a no-op because no such
-# literal exists in this repo. The correct way to override the port is the env
-# var, set by the startup script / systemd unit.
+# assembly-ui is live-only: the Vite dev server (vite.config.ts) uses PORT
+# (default 4214) and proxies /api to assembly-srv (API_TARGET, default 3107)
+# and /nebula to nebula-srv (NEBULA_TARGET, default 3101). The correct way to
+# override the port is the env var, set by the startup script / systemd unit.
 # ------------------------------------------------------------------------------
 echo
-echo "To run the assembly-ui mock API on the target port ($TARGET_PORT):"
-echo "    MOCK_API_PORT=$TARGET_PORT npm start"
-echo "Or the Vite dev server:"
-echo "    PORT=$TARGET_PORT npm run dev"
+echo "To run the assembly-ui Vite dev server on a custom port:"
+echo "    PORT=<port> npm run dev"

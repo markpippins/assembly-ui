@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
-export type ThemeMode = 'light' | 'steel' | 'dark';
+export type ThemeMode = 'light';
 
 interface ThemeContextType {
   theme: ThemeMode;
@@ -13,34 +13,19 @@ const ThemeContext = createContext<ThemeContextType>({
 });
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [theme, setThemeState] = useState<ThemeMode>(() => {
-    return (localStorage.getItem('assembly_theme') as ThemeMode) || 'light';
-  });
-
-  const setTheme = (mode: ThemeMode) => {
-    setThemeState(mode);
-    localStorage.setItem('assembly_theme', mode);
-  };
+  const [theme] = useState<ThemeMode>('light');
 
   useEffect(() => {
     const root = document.documentElement;
     root.classList.remove('light', 'steel', 'dark');
-
-    if (theme === 'steel') {
-      root.classList.add('steel', 'dark');
-    } else if (theme === 'dark') {
-      root.classList.add('dark');
-    } else {
-      root.classList.add('light');
-    }
-  }, [theme]);
+    root.classList.add('light');
+  }, []);
 
   return (
-    <ThemeContext.Provider value={{ theme, setTheme }}>
+    <ThemeContext.Provider value={{ theme, setTheme: () => {} }}>
       {children}
     </ThemeContext.Provider>
   );
 };
 
 export const useTheme = () => useContext(ThemeContext);
-

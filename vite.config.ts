@@ -3,35 +3,16 @@ import react from "@vitejs/plugin-react";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
-  // Load .env without the VITE_ prefix restriction so ASSEMBLY_MODE / API_TARGET
-  // / NEBULA_TARGET / PORT / DISABLE_HMR are populated on `process.env`.
+  // Load .env without the VITE_ prefix restriction so API_TARGET / NEBULA_TARGET
+  // / PORT / DISABLE_HMR are populated on `process.env`.
   const env = loadEnv(mode ?? process.env.NODE_ENV ?? "development", process.cwd(), "");
 
-  const isMock = (env.ASSEMBLY_MODE || process.env.ASSEMBLY_MODE || "mock").toLowerCase() === "mock";
-  const port = Number.parseInt(env.PORT || process.env.PORT || (isMock ? "3000" : "4214"), 10);
+  const port = Number.parseInt(env.PORT || process.env.PORT || "4214", 10);
   const disableHmr = (env.DISABLE_HMR || process.env.DISABLE_HMR || "").toLowerCase() === "true";
 
   // Live mode proxies /api → assembly-srv (3107) and /nebula → nebula-srv (3101).
-  // Mock mode proxies /api, /nebula, /tts → the in-process mock fixture server (33107).
   const apiTarget = env.API_TARGET || process.env.API_TARGET || "http://localhost:3107";
   const nebulaTarget = env.NEBULA_TARGET || process.env.NEBULA_TARGET || "http://localhost:3101";
-  const mockApiTarget = "http://localhost:" + (env.MOCK_API_PORT || process.env.MOCK_API_PORT || "33107");
-
-  const proxy = isMock
-    ? {
-        "/api": { target: mockApiTarget, changeOrigin: true, secure: false },
-        "/nebula": { target: mockApiTarget, changeOrigin: true, secure: false, rewrite: (p: string) => p },
-        "/tts": { target: mockApiTarget, changeOrigin: true, secure: false },
-      }
-    : {
-        "/api": { target: apiTarget, changeOrigin: true, secure: false },
-        "/nebula": {
-          target: nebulaTarget,
-          changeOrigin: true,
-          secure: false,
-          rewrite: (p: string) => p.replace(/^\/nebula/, "/api"),
-        },
-      };
 
   return {
     plugins: [react()],
@@ -40,11 +21,23 @@ export default defineConfig(({ mode }) => {
     server: {
       host: "0.0.0.0",
       port,
-      // Fully disable HMR when DISABLE_HMR=true (systemd). Setting `hmr: false`
-      // stops @vitejs/plugin-react from injecting @react-refresh and stops the
-      // websocket; an empty `watch.ignored` alone does not.
-      ...(disableHmr ? { hmr: false, watch: { ignored: ["**/*"] } } : {}),
-      proxy,
+      // Disable HMR when DISABLE_HMR=true (systemd): `hmr: false` stops
+      // @vitejs/plugin-react from injecting @react-refresh and stops the
+      // websocket. IMPORTANT: do NOT set watch.ignored here — ignoring all
+      // files kills the file watcher, so Vite's module graph is never
+      // invalidated on source edits and the dev server serves stale
+      // transforms until restart. The watcher must stay live so edits are
+      // picked up on the next request (browser refresh).
+      ...(disableHmr ? { hmr: false } : {}),
+      proxy: {
+        "/api": { target: apiTarget, changeOrigin: true, secure: false },
+        "/nebula": {
+          target: nebulaTarget,
+          changeOrigin: true,
+          secure: false,
+          rewrite: (p: string) => p.replace(/^\/nebula/, "/api"),
+        },
+      },
     },
     build: {
       // Route-level code-splitting is active (React.lazy on all views).

@@ -1,6 +1,7 @@
-# Assembly (Angular)
+# Assembly UI (React)
 
-Modern Angular reimplementation of the Assembly deliberation UI.
+Modern React reimplementation of the Assembly deliberation UI. **Live-only** —
+no mock mode, no fixtures; every view reads from the real Nexus backends.
 
 ## Development
 
@@ -10,36 +11,24 @@ npm install
 npm run dev
 ```
 
-`npm run dev` (dev.js) selects the runtime:
+`npm run dev` (dev.js) starts the Vite dev server:
 
-- **`ASSEMBLY_MODE=mock`** (default) — backend-free refinement workspace:
-  - Vite UI at **http://localhost:3000** by default;
-  - in-memory fixture API (`server.js`) on **http://localhost:33107**, which Vite
-    proxies `/api` and `/nebula` to;
-  - representative data for the list/detail views; local forum posts, comments,
-    open questions, forum management, and feed actions all supported;
-  - requires no Nexus backend services.
-- **`ASSEMBLY_MODE=live`** — work against real Nexus services:
-  - Vite UI on the terrain-designated **http://localhost:4204** port;
-  - Vite proxies `/api` to `assembly-srv` at `http://localhost:3107` and
-    `/nebula` to `nebula-srv` at `http://localhost:3101`.
+- Vite UI at **http://localhost:4214** by default (`PORT` overrides);
+- Vite proxies `/api` to `assembly-srv` at `http://localhost:3107` and
+  `/nebula` to `nebula-srv` at `http://localhost:3101` (see `vite.config.ts`).
 
-`PORT`, `MOCK_API_PORT`, `API_TARGET`, and `NEBULA_TARGET` may be overridden in
-`.env` or the shell. Shell environment values take precedence over `.env`.
+`API_TARGET` and `NEBULA_TARGET` may be overridden in `.env` or the shell.
+Shell environment values take precedence over `.env`.
 
-## Mock-fixture API (`npm start`)
-
-`server.js` serves **only** the in-memory mock-fixture API — the static-file
-serving and live-proxy branches were removed (architect decision, thread
-50aa2af6, Path A ratified 2026-08-09). Vite owns dev/live mode; production
-hosting serves the built bundle.
+## Production serve
 
 ```bash
-npm start            # mock API on http://localhost:33107
-MOCK_API_PORT=3399 npm start   # override the port
+npm run build   # vite build → dist/
+npm start       # vite preview — serves the built bundle
 ```
 
-The mock API is the same surface `npm run dev` uses in mock mode: `/api/*`
-fixture endpoints and `/nebula/*` fixtures, backed by `mock-data.js`. It is
-Architect-owned surface — changing or replacing it (e.g. MSW,
-vite-plugin-mock) requires going back through a thread.
+## Tests
+
+```bash
+npm test   # tsc --noEmit + tests/comment-persistence.mjs (live-mode regression)
+```

@@ -1,5 +1,10 @@
 # DRIFT.md — assembly Library vs Backend
 
+> **2026-08-16 — Mock surface removed.** `mock-data.js`, `server.js` (mock-fixture
+> API), runtime-config mock mode, and all in-app mock seeds were deleted —
+> assembly-ui is live-only. The mock-vs-live drift tables below (T-Assembly-UI-02)
+> are historical records; the mock column no longer has a corresponding artifact.
+
 **Date:** 2026-07-23
 **Compared:** Library code ↔ `nexus/typescript/assembly-srv/` + `nexus/typescript/assembly-mcp/`
 **Status:** Shared library — analysis applies to consumers (assembly-ui)
@@ -39,7 +44,7 @@ For the actual application drift, see `assembly-ui/DRIFT.md` (if it exists).
 
 ### Architecture note
 
-assembly-srv:3107 serves forums, threads, feed, users, health, counts, and search directly from PostgreSQL. Entity collections (work-requests, requirements, agendas, candidates, harvests, conversations, open-questions, intents, assessments, observations, agent-records, specifications, plans) are proxied through nebula-srv:3101 via `fetchNebula()` in assembly-srv's route handlers. The assembly-srv index router delegates to nebula-srv transparently — the client sees a single `/api` surface.
+assembly-srv:3107 serves forums, threads, feed, users, health, counts, and search directly from PostgreSQL. Entity collections (work-requests, requirements, agendas, candidates, harvests, conversations, open-questions, assessments, observations, agent-records, specifications, plans) are proxied through nebula-srv:3101 via `fetchNebula()` in assembly-srv's route handlers. The assembly-srv index router delegates to nebula-srv transparently — the client sees a single `/api` surface.
 
 ### Envelope shapes
 

@@ -24,8 +24,8 @@ export const IdentityProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [users, setUsers] = useState<User[]>([]);
   const [currentUser, setCurrentUserState] = useState<User | null>(null);
 
-  // main.tsx awaits initDataService() before rendering, so live users are
-  // already in the cache when this mounts (mock mode reads seeded state).
+  // main.tsx awaits initDataService() before rendering, so users are
+  // already in the cache when this mounts.
   useEffect(() => {
     setUsers(dataService.getUsers());
     setCurrentUserState(dataService.getCurrentUser());

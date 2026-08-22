@@ -144,36 +144,6 @@ export interface Harvest {
   runMetadata: Record<string, unknown> | null;
 }
 
-export interface ConversationSnapshot {
-  id: string;
-  conversationId: string;
-  snapshotIndex: number;
-  sourceHash: string | null;
-  captureMode: string | null;
-  blockCount: number | null;
-  createdBy: string | null;
-  createdAt: string;
-  sourceFilename: string | null;
-}
-
-export interface ConversationBlock {
-  id: string;
-  conversationId: string;
-  snapshotId: string;
-  blockIndex: number;
-  parentTurnId: string | null;
-  parentBlockId: string | null;
-  blockType: string;
-  contentMd: string | null;
-  contentHash: string | null;
-  role: string | null;
-  domPath: string | null;
-  domFingerprint: string | null;
-  firstLineNo: number | null;
-  lastLineNo: number | null;
-  createdAt: string;
-}
-
 export interface OpenQuestionAnswer {
   id: string;
   questionId: string;
