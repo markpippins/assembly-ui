@@ -61,8 +61,10 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSearch }) => {
           </div>
         </div>
 
-        {/* Controls & User Profile */}
-        <div className="flex items-center gap-2 shrink-0">
+        {/* Controls & User Profile — pinned to the right edge; without
+            ml-auto the free space past search's max-w-xl collects here
+            instead, bunching everything against the brand box. */}
+        <div className="ml-auto flex items-center gap-2 shrink-0">
           {isPlaying && (
             <button
               onClick={stop}
