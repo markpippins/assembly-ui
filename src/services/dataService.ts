@@ -151,6 +151,9 @@ export async function refreshDataService(): Promise<boolean> {
       cache[key] = mergeList(cache[key], (data as any)[key] ?? []);
     }
     if (data.counts) cache.counts = data.counts;
+    // Re-apply lazily-loaded record bodies so the poll cycle never blanks
+    // out content that views already displayed.
+    applyAgentRecordContent();
 
     // Per-forum thread lists ship pre-fetched with loadAllData.
     for (const [slug, threads] of Object.entries((data as any)._threadsBySlug ?? {})) {
@@ -247,6 +250,91 @@ function resolveUser(postedById: string | undefined, users: User[]): User {
     if (byStored) return byStored;
   }
   return users[0];
+}
+
+// ── Agent-record content (lazy) ─────────────────────────────────────
+// Record bodies are NOT part of the boot preload anymore (~8k records ×
+// full content paginated to 80+ sequential requests and blocked first
+// paint for minutes). Instead:
+//  - The list views call getAgentRecords(); on first access we kick off a
+//    ONE-TIME background full-content fetch, store bodies in a per-id map,
+//    and emitChange() so mounted views re-read with bodies filled in.
+//  - Detail views call getAgentRecord(id); if the cached row has no body
+//    we fetch just that record's detail endpoint in the background.
+// refreshDataService() re-applies the stored bodies after every core-list
+// merge so a background poll never blanks out loaded content.
+
+const AGENT_CONTENT_RETRY_MS = 60 * 1000;
+let agentContentLastAttempt = 0;
+let agentContentInFlight = false;
+const agentDetailAttempted = new Set<string>();
+
+function agentContentMap(): Record<string, string> {
+  if (!liveCache) return {};
+  if (!(liveCache as any)._agentRecordContent) {
+    (liveCache as any)._agentRecordContent = {} as Record<string, string>;
+  }
+  return (liveCache as any)._agentRecordContent;
+}
+
+/** Fill cached rows' missing bodies from the stored per-id content map. */
+function applyAgentRecordContent(): void {
+  const map = (liveCache as any)?._agentRecordContent as Record<string, string> | undefined;
+  if (!map || !Array.isArray(liveCache?.agentRecords)) return;
+  for (const rec of liveCache!.agentRecords as AgentRecord[]) {
+    if (rec && rec.content == null && map[rec.id] != null) {
+      rec.content = map[rec.id];
+    }
+  }
+}
+
+/** One-time background fetch of all agent-record bodies (60s retry cooldown).
+ *  Walks pages with bounded concurrency — a sequential chain of ~82 pages
+ *  took minutes on a loaded machine. */
+function ensureAgentRecordContent(): void {
+  if (!liveCache || agentContentInFlight) return;
+  if (Date.now() - agentContentLastAttempt < AGENT_CONTENT_RETRY_MS) return;
+  agentContentInFlight = true;
+  agentContentLastAttempt = Date.now();
+  const PAGE_SIZE = 100;
+  const CONCURRENCY = 6;
+
+  api.fetchCollectionPage('agent-records', 1, { includeContent: true, pageSize: PAGE_SIZE })
+    .then(async (first) => {
+      // Sparse array indexed by row position keeps list ordering; holes are
+      // dropped below so a failed page costs its rows, not the whole load.
+      const slots: any[] = [];
+      const place = (page: number, items: any[]) => {
+        for (let i = 0; i < items.length; i++) slots[(page - 1) * PAGE_SIZE + i] = items[i];
+      };
+      place(1, first.items);
+      const totalPages = Math.ceil(first.total / PAGE_SIZE);
+      let next = 2;
+      const worker = async (): Promise<void> => {
+        while (next <= totalPages) {
+          const page = next++;
+          try {
+            place(page, (await api.fetchCollectionPage('agent-records', page, { includeContent: true, pageSize: PAGE_SIZE })).items);
+          } catch { /* skip failed page */ }
+        }
+      };
+      await Promise.all(
+        Array.from({ length: Math.min(CONCURRENCY, Math.max(0, totalPages - 1)) }, worker)
+      );
+      if (!liveCache) return;
+      const full = slots.filter(Boolean);
+      const map = agentContentMap();
+      for (const rec of full as AgentRecord[]) {
+        if (rec?.id != null && rec.content != null) map[rec.id] = rec.content;
+      }
+      liveCache.agentRecords = full;
+      applyAgentRecordContent();
+      emitChange();
+    })
+    .catch((err) => {
+      console.warn('[dataService] agent-record content load failed:', err);
+    })
+    .finally(() => { agentContentInFlight = false; });
 }
 
 class DataService {
@@ -707,12 +795,26 @@ class DataService {
 
   // ── Agent Records ─────────────────────────────────────────────────
   getAgentRecords(typeFilter?: string): AgentRecord[] {
-    const records = liveList('agentRecords');
+    ensureAgentRecordContent();
+    const records = liveList('agentRecords') as AgentRecord[];
     return typeFilter ? records.filter((r: AgentRecord) => r.recordType === typeFilter) : records;
   }
 
   getAgentRecord(id: string): AgentRecord | undefined {
-    return liveItem('agentRecords', id);
+    const item = liveItem('agentRecords', id) as AgentRecord | undefined;
+    if (item && item.content == null && !agentDetailAttempted.has(id)) {
+      agentDetailAttempted.add(id);
+      api.fetchCollectionItem('agent-records', id)
+        .then((raw: any) => {
+          if (raw && liveCache) {
+            if (raw.content != null) agentContentMap()[id] = raw.content;
+            applyAgentRecordContent();
+            emitChange();
+          }
+        })
+        .catch(() => { /* detail stays summary-only */ });
+    }
+    return item;
   }
 
   // ── Specifications ────────────────────────────────────────────────

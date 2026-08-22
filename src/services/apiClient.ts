@@ -184,12 +184,30 @@ const COLLECTIONS = [
 
 export type CollectionName = typeof COLLECTIONS[number];
 
-export async function fetchCollection(name: CollectionName): Promise<any[]> {
-  // The agent-records list projection omits `content` by default (payload
-  // size); the Agent Records / Reports views render record bodies in the
-  // list, so opt in. (nebula-srv GET /api/agent-records?includeContent=true)
-  const params = name === 'agent-records' ? { includeContent: 'true' } : undefined;
+export async function fetchCollection(name: CollectionName, opts?: { includeContent?: boolean }): Promise<any[]> {
+  // Record bodies are opt-in (opts.includeContent) — the default list
+  // projection omits `content` because full-content pulls over ~8k agent
+  // records paginate to 80+ sequential requests (~17 MB) and made boot take
+  // minutes. Views that need bodies lazy-load them via dataService.
+  const params = name === 'agent-records' && opts?.includeContent ? { includeContent: 'true' } : undefined;
   return listAll(`/${name}`, params);
+}
+
+// Single paginated slice of a collection — used by dataService's lazy
+// agent-record body loader, which walks pages with bounded concurrency
+// instead of one long sequential chain.
+export async function fetchCollectionPage(
+  name: CollectionName,
+  page: number,
+  opts?: { includeContent?: boolean; pageSize?: number }
+): Promise<{ items: any[]; total: number }> {
+  const params = name === 'agent-records' && opts?.includeContent ? { includeContent: 'true' } : undefined;
+  const url = listUrl(`/${name}`, {
+    ...(params ?? {}),
+    page: String(page),
+    pageSize: String(opts?.pageSize ?? 100),
+  });
+  return request(url);
 }
 
 export async function fetchCollectionItem(name: CollectionName, id: string): Promise<any | null> {
