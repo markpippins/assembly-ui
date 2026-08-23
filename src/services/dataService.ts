@@ -525,7 +525,10 @@ class DataService {
     const cacheKey = '_threads_' + slug;
     const cached = (liveCache as any)?.[cacheKey];
     if (cached) return cached;
-    // Lazy-load threads for this forum on first access
+    // Pre-init render (render-first boot): liveCache is still null. Return
+    // empty WITHOUT writing — initDataService() emits a change notification
+    // when populated, and this view re-runs then, hitting the lazy-load below.
+    if (!liveCache) return [];
     (liveCache as any)[cacheKey] = [];
     const forum = this.getForums().find((f: Forum) => f.slug === slug);
     const policy = forum ? api.threadBodyPolicy(forum.threadCount) : {};
