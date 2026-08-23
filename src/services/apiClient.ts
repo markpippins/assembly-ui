@@ -310,10 +310,26 @@ export async function fetchAgendaItems(agendaId: string): Promise<any[]> {
 
 // ── Load all data at once (for init) ────────────────────────────────
 // Each fetch is wrapped individually so one 404 doesn't kill the entire load.
+
+// Heavy collections are the ones whose row counts make a full listAll walk
+// expensive server-side (agent-records ≈ 8k rows / 80+ pages, harvests ≈ 1k
+// rows on a slow TOAST-heavy query): 'agent-records' and 'harvests'.
+// Background polls omit them via includeHeavy:false and pull deltas
+// separately (see dataService.refreshDataService).
+
+export interface LoadAllDataOpts {
+  /** Omit heavy collections from the result (default: include them). */
+  includeHeavy?: boolean;
+  /** Skip the per-forum thread prefetch (caller gates on thread count). */
+  skipThreads?: boolean;
+}
+
 const safe = <T>(p: Promise<T>, label: string): Promise<T> =>
   p.catch(err => { console.warn(`[apiClient] ${label} failed:`, err.message); return [] as unknown as T; });
 
-export async function loadAllData(): Promise<Record<string, any>> {
+export async function loadAllData(opts: LoadAllDataOpts = {}): Promise<Record<string, any>> {
+  const includeHeavy = opts.includeHeavy !== false;
+
   const [
     forums,
     feed,
@@ -339,12 +355,12 @@ export async function loadAllData(): Promise<Record<string, any>> {
     safe(fetchCollection('requirements'), 'requirements'),
     safe(fetchCollection('agendas'), 'agendas'),
     safe(fetchCollection('candidates'), 'candidates'),
-    safe(fetchCollection('harvests'), 'harvests'),
+    includeHeavy ? safe(fetchCollection('harvests'), 'harvests') : Promise.resolve(undefined),
     safe(fetchOpenQuestions(), 'open-questions'),
     safe(fetchResolvedQuestions(), 'open-questions-resolved'),
     safe(fetchCollection('assessments'), 'assessments'),
     safe(fetchCollection('observations'), 'observations'),
-    safe(fetchCollection('agent-records'), 'agent-records'),
+    includeHeavy ? safe(fetchCollection('agent-records'), 'agent-records') : Promise.resolve(undefined),
     safe(fetchCollection('specifications'), 'specifications'),
     safe(fetchCollection('plans'), 'plans'),
     safe(fetchSpecs(), 'specs'),
@@ -354,9 +370,10 @@ export async function loadAllData(): Promise<Record<string, any>> {
 
   // Pre-fetch threads for all forums so ForumDetailView doesn't show empty.
   // Small forums request full bodies (previews); large forums request only a
-  // recent body window so the boot payload stays light.
+  // recent body window so the boot payload stays light. Skippable for fast
+  // background polls where the thread count hasn't changed.
   const threadsBySlug: Record<string, any[]> = {};
-  if (Array.isArray(forums) && forums.length > 0) {
+  if (!opts.skipThreads && Array.isArray(forums) && forums.length > 0) {
     const threadResults = await Promise.allSettled(
       forums.map((f: any) =>
         fetchThreads(f.slug, threadBodyPolicy(f.threadCount)).then(t => ({ slug: f.slug, threads: t }))

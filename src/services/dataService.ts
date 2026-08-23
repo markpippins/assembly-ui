@@ -64,6 +64,9 @@ export async function initDataService(): Promise<void> {
   try {
     const data = await api.loadAllData();
     liveCache = data;
+    // Seed the per-collection total tracker from boot counts so the first
+    // background poll can skip unchanged heavy collections immediately.
+    if (data.counts) (liveCache as any)._totals = { ...data.counts };
     // Pre-populate per-forum thread caches so ForumDetailView renders
     // threads immediately without lazy-load delay.
     const bySlug = (data as any)._threadsBySlug;
@@ -92,6 +95,12 @@ export async function initDataService(): Promise<void> {
 // Re-pulls live data from the backends and merges it into liveCache IN
 // PLACE, then notifies subscribers so mounted views re-read the cache.
 // Design notes:
+// - INCREMENTAL: a ~25ms /counts probe gates the expensive work. The heavy
+//   collections (agent-records ≈ 8k rows / 80+ pages, harvests ≈ 1k rows on
+//   a slow server-side query) are only re-pulled when their row count
+//   changed — and then usually just page 1 (newest rows), union-merged into
+//   the cache. A full resync (everything + per-forum threads) runs every
+//   FULL_RESYNC_EVERY cycles to catch deletions and mid-list inserts.
 // - Core collections are replaced with fresh rows; optimistic local-only
 //   entries (client-created rows whose server ack hasn't landed in a poll
 //   yet) are preserved on top so user posts never blink away.
@@ -99,14 +108,29 @@ export async function initDataService(): Promise<void> {
 //   answers, harvest details) are re-fetched BEFORE the notification fires,
 //   so the view the user is looking at swaps straight to fresh data with no
 //   empty flicker window.
+
+// Full resync cadence: at 15s base interval this is ~5 minutes.
+const FULL_RESYNC_EVERY = 20;
+// counts-endpoint key → collection name for the heavy collections.
+const HEAVY_COUNT_KEYS: Record<string, string> = {
+  agentRecords: 'agent-records',
+  harvests: 'harvests',
+};
+// Page-1 delta pulls are trusted only for small count deltas (unstable
+// server ordering can overlap pages; a margin below the 100-row page size
+// keeps the "all new rows are on page 1" assumption safe).
+const DELTA_MAX_ROWS = 90;
+
+let refreshCycle = 0;
+
 export async function refreshDataService(): Promise<boolean> {
   if (!liveCache) {
     await initDataService();
     return true;
   }
   try {
-    const data = await api.loadAllData();
     const cache = liveCache;
+    const fullResync = refreshCycle++ % FULL_RESYNC_EVERY === 0;
 
     // 1. Refresh recently-viewed lazy detail caches first.
     const lazyTasks: Promise<void>[] = [];
@@ -140,7 +164,62 @@ export async function refreshDataService(): Promise<boolean> {
     }
     await Promise.all(lazyTasks);
 
-    // 2. Merge fresh core collections into the cache in place.
+    // 2. Counts probe decides what needs pulling. If it fails, fall back to
+    // a full resync — correctness over speed when we can't see row counts.
+    let counts: Record<string, number> | null = null;
+    try { counts = await api.fetchCounts(); } catch { /* fall through */ }
+
+    // Per-forum thread prefetch is skipped while the global thread count is
+    // unchanged; new/edited comments in already-open threads are still kept
+    // fresh by the lazy-detail pass above, and the periodic full resync
+    // refreshes forum previews regardless.
+    const storedTotals = ((cache as any)._totals ??= {}) as Record<string, number>;
+    const skipThreads =
+      !fullResync && !!counts && counts.threads === storedTotals['threads'];
+
+    // Heavy collections: pull only what changed. Delta mode fetches just the
+    // newest rows (page 1); full mode walks all pages via loadAllData.
+    const deltaJobs: Array<{ key: string; collection: string }> = [];
+    if (counts && !fullResync) {
+      for (const [countKey, collection] of Object.entries(HEAVY_COUNT_KEYS)) {
+        const total = counts[countKey];
+        const stored = storedTotals[countKey];
+        const delta = total != null && stored != null ? total - stored : null;
+        if (
+          total != null && stored != null &&
+          total > 150 && delta !== null && delta > 0 && delta <= DELTA_MAX_ROWS
+        ) {
+          deltaJobs.push({ key: countKey, collection });
+        }
+      }
+    }
+
+    const [data, ...deltaPages] = await Promise.all([
+      // No counts visibility → play safe and do a full pull this cycle.
+      api.loadAllData({ includeHeavy: fullResync || !counts, skipThreads }),
+      ...deltaJobs.map((j) =>
+        api.fetchCollectionPage(j.collection as any, 1, { pageSize: 100 })
+          .catch(() => ({ items: [], total: 0 }))
+      ),
+    ]);
+    // A failed or oversized delta falls back to a full walk next cycle by
+    // leaving storedTotals untouched for that key.
+
+    // 3. Merge fetched data into the cache in place.
+    let changed = false;
+
+    // 3a. Delta merges first — prepend the newest rows to the cached list.
+    deltaJobs.forEach((j, i) => {
+      const page = deltaPages[i];
+      const key = j.key;
+      if (!page || page.items.length === 0) return;
+      const existing = Array.isArray(cache[key]) ? cache[key] : [];
+      cache[key] = mergeNewer(existing, page.items);
+      changed = true;
+    });
+
+    // 3b. Core collections replaced with fresh rows (only keys actually
+    // present in the payload — fast polls omit the heavy ones).
     const CORE_LIST_KEYS = [
       'forums', 'feed', 'workRequests', 'requirements', 'agendas',
       'candidates', 'harvests', 'openQuestions', 'resolvedOpenQuestions',
@@ -148,20 +227,35 @@ export async function refreshDataService(): Promise<boolean> {
       'plans', 'specs', 'users',
     ] as const;
     for (const key of CORE_LIST_KEYS) {
-      cache[key] = mergeList(cache[key], (data as any)[key] ?? []);
+      if (!Array.isArray((data as any)[key])) continue;
+      // Skip a key we just delta-merged above (its full list wasn't pulled).
+      if (deltaJobs.some((j) => j.key === key)) continue;
+      cache[key] = mergeList(cache[key], (data as any)[key]);
+      changed = true;
     }
-    if (data.counts) cache.counts = data.counts;
+    if (counts) cache.counts = counts;
+    else if (data.counts) cache.counts = data.counts;
     // Re-apply lazily-loaded record bodies so the poll cycle never blanks
     // out content that views already displayed.
     applyAgentRecordContent();
 
-    // Per-forum thread lists ship pre-fetched with loadAllData.
-    for (const [slug, threads] of Object.entries((data as any)._threadsBySlug ?? {})) {
-      const key = '_threads_' + slug;
-      cache[key] = mergeList(cache[key], threads as any[]);
+    // 3c. Per-forum thread lists ship pre-fetched with loadAllData (when not
+    // skipped).
+    const bySlug = (data as any)._threadsBySlug;
+    if (bySlug && Object.keys(bySlug).length > 0) {
+      for (const [slug, threads] of Object.entries(bySlug)) {
+        const key = '_threads_' + slug;
+        cache[key] = mergeList(cache[key], threads as any[]);
+      }
+      changed = true;
     }
 
-    emitChange();
+    // 4. Persist the totals snapshot so future polls can gate on it.
+    if (counts) {
+      for (const k of Object.keys(counts)) storedTotals[k] = counts[k];
+    }
+
+    if (changed) emitChange();
     return true;
   } catch (err) {
     console.warn('[dataService] Background refresh failed:', err);
@@ -183,6 +277,25 @@ function mergeList(existing: any[] | undefined, fresh: any[]): any[] {
     (e) => isLocalOnlyId(e?.id) && !freshIds.has(String(e.id))
   );
   return localOnly.length > 0 ? [...localOnly, ...fresh] : fresh;
+}
+
+// Union-merge for incremental (page-1 delta) pulls: the fetched rows are the
+// newest ones, so they go on top; already-cached rows that weren't re-fetched
+// keep their positions below. Optimistic local-only entries stay on the very
+// top, same as mergeList.
+function mergeNewer(existing: any[], fresh: any[]): any[] {
+  const freshIds = new Set(
+    fresh.filter((f) => f?.id != null).map((f) => String(f.id))
+  );
+  const notInFresh = (e: any) =>
+    e?.id == null || !freshIds.has(String(e.id));
+  const localOnly = existing.filter(
+    (e) => isLocalOnlyId(e?.id) && notInFresh(e)
+  );
+  const rest = existing.filter(
+    (e) => !isLocalOnlyId(e?.id) && notInFresh(e)
+  );
+  return [...localOnly, ...fresh, ...rest];
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────
