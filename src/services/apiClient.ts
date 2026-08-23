@@ -395,8 +395,9 @@ export async function loadAllData(opts: LoadAllDataOpts = {}): Promise<Record<st
   };
 }
 
-// ── Substance segment sets (external service on port 3115) ─────────
-const SUBSTANCE_BASE = 'http://localhost:3115';
+// ── Substance segment sets ─────────────────────────────────────────
+// LAC rule 4: target from env (VITE_SUBSTANCE_URL), documented default :3115.
+const SUBSTANCE_BASE = ((import.meta as any).env?.VITE_SUBSTANCE_URL as string | undefined) || 'http://localhost:3115';
 
 export interface SegmentSet {
   id: string;
