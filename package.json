@@ -8,7 +8,7 @@
     "build": "vite build",
     "start": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test": "tsc --noEmit && node tests/comment-persistence.mjs && node tests/decision-cards.mjs"
+    "test": "vitest run --root src/services"
   },
   "dependencies": {
     "autoprefixer": "^10.4.0",
@@ -27,7 +27,9 @@
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "@vitejs/plugin-react": "^6.0.5",
+    "happy-dom": "^20.11.6",
     "typescript": "~5.9.0",
-    "vite": "^8.2.0"
+    "vite": "^8.2.0",
+    "vitest": "^4.1.11"
   }
 }
