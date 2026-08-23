@@ -46,11 +46,12 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSearch }) => {
       </div>
 
       {/* White content area */}
-      <div className="flex-1 flex items-center bg-white/90 backdrop-blur-md px-4 gap-4">
-        {/* Global Search Trigger Bar */}
+      <div className="relative flex-1 flex items-center bg-white/90 backdrop-blur-md px-4 gap-4">
+        {/* Global Search Trigger Bar — absolutely centered in the header so the
+            brand box and the right-edge controls never shift it */}
         <div
           onClick={onOpenSearch}
-          className="flex-1 max-w-xl relative cursor-pointer group"
+          className="absolute left-1/2 -translate-x-1/2 w-full max-w-xl cursor-pointer group"
         >
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none group-hover:text-indigo-500 transition-colors" />
           <div className="w-full h-9 pl-9 pr-3 text-sm bg-slate-100/90 border border-slate-200 rounded-lg text-slate-400 flex items-center justify-between transition-all group-hover:border-indigo-500/50 group-hover:ring-2 group-hover:ring-indigo-500/10">
