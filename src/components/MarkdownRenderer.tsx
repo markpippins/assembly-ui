@@ -50,6 +50,15 @@ export function renderMarkdown(content: string): string {
  // Links
  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-primary-700 hover:underline" target="_blank" rel="noopener noreferrer">$1</a>');
 
+ // Bare-URL autolink — real links for pasted URLs that aren't in [text](url)
+ // form (e.g. PR lists, log excerpts). Runs AFTER the markdown-link pass so
+ // URLs already wrapped in href="…" are skipped via the (?<!") lookbehind;
+ // (?<!\() keeps markdown-target parens from double-matching if this pass
+ // ever moves. Trailing punctuation and closing parens stay outside the link.
+ html = html.replace(/(?<!["'=\w])(https?:\/\/[^\s<>"]+?)([.,;:!?)\]]*)(?=[\s<]|$)/g,
+   (_m, url: string, punct: string) =>
+     `<a href="${url}" class="text-primary-700 hover:underline break-all" target="_blank" rel="noopener noreferrer">${url}</a>${punct}`);
+
  // Task lists (- [ ] / - [x]) — must run before the unordered-list regex below.
  // Rendered as static (disabled) checkboxes so existing content shows correctly;
  // interactive selection with submit-as-reply is provided by <InteractiveMarkdown>.
