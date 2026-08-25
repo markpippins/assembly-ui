@@ -34,9 +34,9 @@ export interface ChoiceItem {
 }
 
 export type Segment =
- | { type: 'markdown'; content: string }
- | { type: 'tasks'; blockIdx: number; items: TaskItem[] }
- | { type: 'choices'; blockIdx: number; items: ChoiceItem[]; header?: string };
+  | { type: 'markdown'; content: string }
+  | { type: 'tasks'; blockIdx: number; items: TaskItem[]; header?: string }
+  | { type: 'choices'; blockIdx: number; items: ChoiceItem[]; header?: string };
 
 const TASK_LINE_RE = /^\s*[-*]\s+\[([ xX])\][ \t]*(.*)$/;
 const CHOICE_LINE_RE = /^\s*[-*]\s+\(([ xX])\)[ \t]*(.*)$/;
@@ -48,64 +48,131 @@ export function isOtherItem(text: string): boolean {
 }
 
 export function splitSegments(content: string): Segment[] {
- if (!content) return [];
- const blocks = content.split(/\n\s*\n/);
- const segments: Segment[] = [];
- let blockIdx = 0;
- for (const block of blocks) {
- const lines = block.split('\n').filter((l) => l.trim().length > 0);
- if (lines.length === 0) {
- segments.push({ type: 'markdown', content: block });
- continue;
- }
- if (lines.every((l) => TASK_LINE_RE.test(l))) {
- segments.push({
- type: 'tasks',
- blockIdx: blockIdx++,
- items: lines.map((l) => {
- const m = l.match(TASK_LINE_RE)!;
- return { text: m[2], initiallyChecked: m[1].toLowerCase() === 'x' };
- }),
- });
- } else if (lines.every((l) => CHOICE_LINE_RE.test(l))) {
- segments.push({
- type: 'choices',
- blockIdx: blockIdx++,
- items: lines.map((l) => {
- const m = l.match(CHOICE_LINE_RE)!;
- return { text: m[2], initiallySelected: m[1].toLowerCase() === 'x' };
- }),
- });
- } else {
- // Card-with-header support (promotion-gate batch format): a block whose
- // leading line(s) are bold card headers followed by ALL radio-choice
- // lines is one decision card — the header renders above the radios.
- // Without this, the header line poisons the block into plain markdown
- // and the operator sees raw parens instead of usable cards.
- const firstChoice = lines.findIndex((l) => CHOICE_LINE_RE.test(l));
- const headLines = firstChoice > 0 ? lines.slice(0, firstChoice) : [];
- const restAllChoices =
- firstChoice > 0 && lines.slice(firstChoice).every((l) => CHOICE_LINE_RE.test(l));
- const headersOk =
- headLines.length > 0 &&
- headLines.length <= 2 &&
- headLines.every((l) => /^\*\*.+\*\*/.test(l.trim()));
- if (restAllChoices && headersOk) {
- segments.push({
- type: 'choices',
- blockIdx: blockIdx++,
- header: headLines.join(' '),
- items: lines.slice(firstChoice).map((l) => {
- const m = l.match(CHOICE_LINE_RE)!;
- return { text: m[2], initiallySelected: m[1].toLowerCase() === 'x' };
- }),
- });
- } else {
- segments.push({ type: 'markdown', content: block });
- }
- }
- }
- return segments;
+  if (!content) return [];
+  const blocks = content.split(/\n\s*\n/);
+  const segments: Segment[] = [];
+  let blockIdx = 0;
+  for (const block of blocks) {
+    const lines = block.split('\n').filter((l) => l.trim().length > 0);
+    if (lines.length === 0) {
+      segments.push({ type: 'markdown', content: block });
+      continue;
+    }
+    if (lines.every((l) => TASK_LINE_RE.test(l))) {
+      segments.push({
+        type: 'tasks',
+        blockIdx: blockIdx++,
+        items: lines.map((l) => {
+          const m = l.match(TASK_LINE_RE)!;
+          return { text: m[2], initiallyChecked: m[1].toLowerCase() === 'x' };
+        }),
+      });
+    } else if (lines.every((l) => CHOICE_LINE_RE.test(l))) {
+      segments.push({
+        type: 'choices',
+        blockIdx: blockIdx++,
+        items: lines.map((l) => {
+          const m = l.match(CHOICE_LINE_RE)!;
+          return { text: m[2], initiallySelected: m[1].toLowerCase() === 'x' };
+        }),
+      });
+    } else {
+      // Card-with-header support — GENERALIZED (architect-approved quick fix,
+      // decision a444ba40/decd5dc5): a single paragraph block may glue several
+      // "heading + interactive list" sections together with no blank lines
+      // (the Wind-WR ratification series format: `## Section` immediately
+      // followed by `- [ ]` items). Partition the block at header-ish lines;
+      // each section becomes an attached card when its list is homogeneous
+      // AND a header is present. Headerless lists keep the previous static
+      // rendering (no behaviour change outside card contexts), and mixed
+      // task/choice sections degrade safely to markdown.
+      //
+      // Legacy forms are preserved: all-task / all-choice blocks hit the fast
+      // paths above; bold-header + radio blocks render as attached choice
+      // cards exactly as before.
+      const isHeaderLine = (l: string) =>
+        // Loose-bold match mirrors the legacy header rule (**…** anywhere in
+        // the line, e.g. "**Card `x`** — Title") plus ##-style headings.
+        /\*\*.+\*\*/.test(l.trim()) || /^#{1,6}\s+\S/.test(l.trim());
+      const kindOf = (l: string): 'task' | 'choice' | null => {
+        if (TASK_LINE_RE.test(l)) return 'task';
+        if (CHOICE_LINE_RE.test(l)) return 'choice';
+        return null;
+      };
+
+      interface Section {
+        headers: string[];
+        items: string[];
+        uniformKind: 'task' | 'choice' | null;
+      }
+      let cur: Section | null = null;
+      const pendingHeaders: string[] = [];
+      const mdRun: string[] = [];
+
+      const closeSection = () => {
+        // Emit any buffered markdown FIRST — it precedes this section in
+        // document order.
+        if (mdRun.length) {
+          segments.push({ type: 'markdown', content: mdRun.splice(0).join('\n') });
+        }
+        if (!cur) return;
+        if (cur.items.length > 0 && cur.uniformKind && cur.headers.length > 0) {
+          const bIdx = blockIdx++;
+          const header = cur.headers.join('\n');
+          let seg: Segment;
+          if (cur.uniformKind === 'task') {
+            const items = cur.items.map((l) => {
+              const m = l.match(TASK_LINE_RE)!;
+              return { text: m[2], initiallyChecked: m[1].toLowerCase() === 'x' };
+            });
+            seg = { type: 'tasks', blockIdx: bIdx, header, items };
+          } else {
+            const items = cur.items.map((l) => {
+              const m = l.match(CHOICE_LINE_RE)!;
+              return { text: m[2], initiallySelected: m[1].toLowerCase() === 'x' };
+            });
+            seg = { type: 'choices', blockIdx: bIdx, header, items };
+          }
+          segments.push(seg);
+        } else if (cur.items.length > 0 || cur.headers.length > 0) {
+          segments.push({
+            type: 'markdown',
+            content: [...cur.headers, ...cur.items].join('\n'),
+          });
+        }
+        cur = null;
+      };
+
+      for (const line of lines) {
+        const kind = kindOf(line);
+        if (kind) {
+          if (!cur) cur = { headers: pendingHeaders.splice(0), items: [], uniformKind: kind };
+          else if (cur.uniformKind !== kind) {
+            // mixed kinds inside one section — degrade whole section
+            cur.uniformKind = null;
+          }
+          cur.items.push(line);
+        } else if (isHeaderLine(line)) {
+          closeSection();
+          pendingHeaders.push(line);
+        } else {
+          closeSection();
+          mdRun.push(...pendingHeaders.splice(0), line);
+        }
+      }
+      closeSection();
+      if (pendingHeaders.length) mdRun.push(...pendingHeaders);
+      if (mdRun.length) {
+        segments.push({ type: 'markdown', content: mdRun.join('\n') });
+      }
+
+      // Guard: if nothing was produced (shouldn't happen), keep legacy output.
+      if (segments.length === 0) {
+        segments.push({ type: 'markdown', content: block });
+      }
+    }
+  }
+  return segments;
 }
 
 /** Effective item label — appends typed "Other" text when present. */
@@ -217,10 +284,13 @@ export const InteractiveMarkdown: React.FC<InteractiveMarkdownProps> = ({
  if (seg.type === 'markdown') {
  return <MarkdownRenderer key={i} content={seg.content} />;
  }
- if (seg.type === 'tasks') {
- return (
- <div key={i} className="task-list space-y-0.5 my-1.5">
- {seg.items.map((item, j) => {
+    if (seg.type === 'tasks') {
+      return (
+        <div key={i} className="task-list space-y-0.5 my-1.5">
+        {'header' in seg && seg.header && (
+          <MarkdownRenderer content={seg.header} />
+        )}
+        {seg.items.map((item, j) => {
  const key = `${sourceId}:${seg.blockIdx}:${j}`;
  const checked = checkedMap[key] ?? item.initiallyChecked;
  const isOther = isOtherItem(item.text);

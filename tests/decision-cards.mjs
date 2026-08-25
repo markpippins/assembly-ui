@@ -131,6 +131,57 @@ const multiReply = buildSelectionBody(multi, 'm', { 'm:0:0': true }, {}, {});
 check('both blocks re-emitted', multiReply.includes('- [x] item1') && multiReply.includes('- (x) opt2'), multiReply);
 check('prose sections not re-emitted', !multiReply.includes('section one'), multiReply);
 
+
+// ── splitSegments: headed/h2-adjacent sections (quick fix a444ba40) ────
+// Wind-WR ratification format: `## Section` glued to `- [ ]` items with no
+// blank lines, multiple sections per paragraph block.
+const windWr = splitSegments(
+  [
+    'Purpose: the core implementation loop.',
+    '',
+    '## builder chain',
+    '- [ ] Status report BEFORE each step',
+    '- [ ] Implementation step executed',
+    '',
+    '## SOL / PEB / Shrapnel',
+    '- [ ] hooks left intact',
+    '- [ ] evidence row per milestone',
+  ].join('\n'),
+);
+const wrTasks = windWr.filter((s) => s.type === 'tasks');
+check('h2+tasks sections become interactive', wrTasks.length === 2, JSON.stringify(windWr.map((s) => s.type)));
+check(
+  'section headers attached to task cards',
+  wrTasks[0]?.header === '## builder chain' && wrTasks[1]?.header === '## SOL / PEB / Shrapnel',
+  JSON.stringify(wrTasks.map((s) => s.header)),
+);
+check(
+  'blockIdx monotonic across section cards',
+  wrTasks[0]?.blockIdx === 0 && wrTasks[1]?.blockIdx === 1,
+  JSON.stringify(wrTasks.map((s) => s.blockIdx)),
+);
+
+// Multi-section GLUED in one block (no blank lines at all) — the actual bug.
+const glued = splitSegments(
+  ['## builder chain', '- [ ] one', '- [ ] two', '## SOL', '- [ ] three'].join('\n'),
+);
+const gluedTasks = glued.filter((s) => s.type === 'tasks');
+check('glued no-blank-line sections split into cards', gluedTasks.length === 2, JSON.stringify(glued.map((s) => s.type)));
+check('glued second card carries its own header', gluedTasks[1]?.header === '## SOL', JSON.stringify(gluedTasks.map((s) => s.header)));
+
+// Legacy promotion-card form unchanged: bold header + radios attaches.
+const promo = splitSegments('**Card `2444b14d`** — Title here\n- ( ) Approve as mapped\n- ( ) Strike');
+check('bold+radio promotion card attaches', promo.length === 1 && promo[0].type === 'choices' && !!promo[0].header, JSON.stringify(promo));
+
+// Headerless PURE task list stays interactive via the legacy fast path
+// (pre-existing behaviour — only heading-glued blocks were broken).
+const bare = splitSegments('- [ ] standalone item');
+check('headerless pure task list still interactive (legacy)', bare.length === 1 && bare[0].type === 'tasks', JSON.stringify(bare));
+
+// Mixed kinds inside one section degrade safely to markdown.
+const mixedSection = splitSegments('**Header**\n- [ ] task line\n- ( ) radio line');
+check('mixed-kind section degrades to markdown', mixedSection.every((s) => s.type === 'markdown'), JSON.stringify(mixedSection));
+
 // ── Report ─────────────────────────────────────────────────────────────
 
 if (failures > 0) {
