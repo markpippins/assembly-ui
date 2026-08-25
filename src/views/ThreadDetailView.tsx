@@ -3,8 +3,10 @@ import { useParams, Link } from 'react-router-dom';
 import { Send, CornerDownRight, CheckCircle2, Pencil, Trash2 } from 'lucide-react';
 import { Avatar } from '../components/Avatar';
 import { TTSButton } from '../components/TTSButton';
-import { InteractiveMarkdown, buildSelectionBody } from '../components/InteractiveMarkdown';
+import { InteractiveMarkdown, buildSelectionBody, splitSegments, isOtherItem } from '../components/InteractiveMarkdown';
+import { BulkVerdictBar } from '../components/BulkVerdictBar'; // [bulk-verdict]
 import { dataService } from '../services/dataService';
+import * as api from '../services/apiClient';
 import { useLiveData } from '../context/LiveDataContext';
 import { StatusIndicator } from '../components/StatusIndicator';
 import { formatDateTime } from '../utils/format';
@@ -29,14 +31,21 @@ export const ThreadDetailView: React.FC = () => {
  const [otherTexts, setOtherTexts] = useState<Record<string, string>>({});
  // sourceIds ('thread' or comment id) that already submitted an agreement reply.
  const [submittedFor, setSubmittedFor] = useState<Set<string>>(new Set());
+ // Persisted decision-card state re-hydrated from shrapnel after reload:
+ // sources whose submitted decision records exist on the server.
+ const [persistedSubmissions, setPersistedSubmissions] = useState<
+   Record<string, { mode: string; blockIdx: number; selections: api.DecisionSelection[] }[]>
+ >({});
  const { showToast } = useToast();
 
  const loadData = () => {
+ console.log('[tdv] loadData start ' + JSON.stringify({ slug, threadId }));
  if (!threadId) return;
  // Warm the per-forum thread cache (live mode keeps threads per slug in liveCache,
  // so getThreads(slug) populates it synchronously before getThread is consulted).
  if (slug) dataService.getThreads(slug);
  const res = dataService.getThread(threadId);
+ console.log('[tdv] getThread sync ' + JSON.stringify({ thread: !!res.thread, comments: res.comments.length }));
  if (res.thread) setThread(res.thread);
  if (res.comments.length) setComments(res.comments);
  // The API fetch resolves asynchronously into the cache after this
@@ -52,6 +61,7 @@ export const ThreadDetailView: React.FC = () => {
  const checkData = () => {
  attempts++;
  const r2 = dataService.getThread(threadId);
+ console.log('[tdv] poll ' + attempts + ' ' + JSON.stringify({ thread: !!r2.thread, hasBody: !!r2.thread?.body, comments: r2.comments.length }));
  if (r2.thread) setThread(r2.thread);
  if (r2.comments.length) setComments(r2.comments);
  const threadReady = !!r2.thread?.body;
@@ -66,10 +76,35 @@ export const ThreadDetailView: React.FC = () => {
  }
  };
 
+ // Load thread + comments on mount and on LiveData version bumps.
  useEffect(() => {
- loadData();
- // eslint-disable-next-line react-hooks/exhaustive-deps
- }, [threadId, slug, version]);
+   console.log('[tdv] mount effect ' + JSON.stringify({ slug, threadId, version }));
+   loadData();
+   // eslint-disable-next-line react-hooks/exhaustive-deps
+ }, [threadId, version]);
+
+ // Re-hydrate submitted decisions from shrapnel so cards stay frozen
+ // across reloads (the durable reply comment remains the source of
+ // truth — this just restores the visual submitted state).
+ useEffect(() => {
+   if (!threadId) return;
+   let cancelled = false;
+   api.fetchDecisions(threadId).then((items) => {
+     if (cancelled || !Array.isArray(items)) return;
+     const bySource: typeof persistedSubmissions = {};
+     const submitted: Set<string> = new Set();
+     for (const d of items) {
+       if (!d.sourceId) continue;
+       if (!bySource[d.sourceId]) bySource[d.sourceId] = [];
+       bySource[d.sourceId].push(d);
+       submitted.add(d.sourceId);
+     }
+     setPersistedSubmissions(bySource);
+     setSubmittedFor((prev) => new Set([...prev, ...submitted]));
+   }).catch(() => { /* shrapnel store unavailable — UI-only freeze as before */ });
+   return () => { cancelled = true; };
+   // eslint-disable-next-line react-hooks/exhaustive-deps
+ }, [threadId]);
 
  const handlePostComment = (e: React.FormEvent, parentId?: string | null) => {
  e.preventDefault();
@@ -161,16 +196,52 @@ export const ThreadDetailView: React.FC = () => {
  });
  return next;
  });
- };
-
- const handleSubmitSelection = (sourceId: string, sourceBody: string, parentId: string | null) => {
- if (!threadId) return;
- const body = buildSelectionBody(sourceBody, sourceId, checkedTasks, radioTasks, otherTexts);
- dataService.addComment(threadId, { body, parentId });
- clearSource(sourceId);
- setSubmittedFor((prev) => new Set(prev).add(sourceId));
- showToast('Agreement posted as reply', 'success');
- loadData();
+ }; const handleSubmitSelection = (sourceId: string, sourceBody: string, parentId: string | null) => {
+   if (!threadId) return;
+   const body = buildSelectionBody(sourceBody, sourceId, checkedTasks, radioTasks, otherTexts);
+   // Durable record: the "Agreed selection:" reply comment.
+   const posted = dataService.addComment(threadId, { body, parentId });
+   // Derived artifact: snapshot the decision into the shrapnel EAV store
+   // so submitted cards re-hydrate frozen after reload.
+   const segments = splitSegments(sourceBody);
+   const selections: api.DecisionSelection[] = [];
+   for (const seg of segments) {
+     if (seg.type !== 'tasks' && seg.type !== 'choices') continue;
+     const blockIdx = seg.blockIdx;
+     const blockKey = `${sourceId}:${blockIdx}`;
+     const initialIdx = seg.type === 'choices'
+       ? seg.items.findIndex((i) => i.initiallySelected)
+       : -1;
+     const selected = seg.type === 'choices'
+       ? (radioTasks[blockKey] ?? (initialIdx >= 0 ? initialIdx : -1))
+       : undefined;
+     seg.items.forEach((item, itemIdx) => {
+       const key = `${sourceId}:${blockIdx}:${itemIdx}`;
+       const other = otherTexts[`other:${key}`];
+       const isChecked = seg.type === 'tasks'
+         ? (checkedTasks[key] ?? (seg.items[itemIdx] as { initiallyChecked: boolean }).initiallyChecked)
+         : (selected === itemIdx);
+       selections.push({
+         itemIdx,
+         label: isOtherItem(item.text) && other ? `Other: ${other}` : item.text,
+         selected: isChecked,
+         other,
+       });
+     });
+   }
+   dataService.saveDecision({
+     threadId,
+     sourceId,
+     mode: segments.some((s) => s.type === 'choices') ? 'choices' : 'tasks',
+     blockIdx: segments.findIndex((s) => s.type !== 'markdown'),
+     selections,
+     replyCommentId: posted.id,
+     submittedAt: new Date().toISOString(),
+   });
+   clearSource(sourceId);
+   setSubmittedFor((prev) => new Set(prev).add(sourceId));
+   showToast('Agreement posted as reply', 'success');
+   loadData();
  };
 
  // Agreement bar: appears under any source (thread body or comment) with checked items.
@@ -418,6 +489,13 @@ export const ThreadDetailView: React.FC = () => {
  otherMap={otherTexts}
  onOtherChange={handleOtherChange}
  disabled={submittedFor.has('thread')}
+ />
+ {/* [bulk-verdict] bulk actions above card list (to-do d9ac7608) */}
+ <BulkVerdictBar
+ threadBody={thread.body}
+ sourceId="thread"
+ disabled={submittedFor.has('thread')}
+ onRadio={handleRadioToggle}
  />
  <SelectionBar sourceId="thread" sourceBody={thread.body} parentId={null} />
  </div>

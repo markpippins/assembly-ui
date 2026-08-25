@@ -636,8 +636,40 @@ class DataService {
     return newComment;
   }
 
+  // ── Decision cards (shrapnel persistence) ─────────────────────────
+  // Best-effort fire-and-forget (the "Agreed selection:" reply comment is
+  // the durable source of truth; the shrapnel record re-hydrates submitted
+  // state after reload). Errors are swallowed — the UI already shows the
+  // reply, so persist failure degrades to last-write-wins in thread text.
+  saveDecision(data: {
+    threadId: string;
+    sourceId: string;
+    mode: string;
+    blockIdx: number;
+    selections: { itemIdx: number; label: string; selected: boolean; other?: string }[];
+    replyCommentId?: string | null;
+    submittedBy?: string | null;
+    submittedAt?: string | null;
+  }): void {
+    const user = resolveUser(data.submittedBy ?? undefined, liveList('users') as User[]);
+    api.saveDecision({
+      ...data,
+      submittedBy: data.submittedBy ?? user.name,
+      submittedAt: data.submittedAt ?? new Date().toISOString(),
+    }).catch((err) => {
+      console.error('[assembly-ui] saveDecision failed:', err);
+    });
+  }
+
+  getDecisions(threadId: string): Promise<any[]> {
+    return api.fetchDecisions(threadId).catch((err) => {
+      console.warn('[assembly-ui] fetchDecisions failed:', err);
+      return [];
+    });
+  }
+
   // ── Thread status indicator ───────────────────────────────────────
-  // Optimistically update every cached copy of the thread (detail + any
+  // Optimistic updates every cached copy of the thread (detail + any
   // per-forum list), persist via PUT /status, then notify so mounted
   // views re-read. Any commenter may advance the status.
   setThreadStatus(threadId: string, rating: number): boolean {
@@ -789,13 +821,6 @@ class DataService {
       })
       .catch(() => {});
     return listItem;
-  }
-
-  updateHarvest(id: string, sourceText: string): boolean {
-    const h = liveItem('harvests', id) as Harvest | undefined;
-    if (h) { h.sourceText = sourceText; h.fileSize = sourceText.length; }
-    api.updateHarvest(id, { sourceText }).catch(() => {});
-    return !!h;
   }
 
   // ── Open Questions ────────────────────────────────────────────────

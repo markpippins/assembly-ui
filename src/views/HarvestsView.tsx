@@ -1,19 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Sprout, Edit3, Save, ChevronRight, FileCode } from 'lucide-react';
+import { ChevronRight, FileCode } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
 import { dataService } from '../services/dataService';
 import { useLiveData } from '../context/LiveDataContext';
 import { formatDateTime } from '../utils/format';
-import { useToast } from '../context/ToastContext';
 import { Harvest } from '../types';
 
 export const HarvestsView: React.FC = () => {
  const { version } = useLiveData();
  const [harvests, setHarvests] = useState<Harvest[]>([]);
- const [editingId, setEditingId] = useState<string | null>(null);
- const [editText, setEditText] = useState('');
- const { showToast } = useToast();
 
  const loadHarvests = () => {
  setHarvests(dataService.getHarvests());
@@ -22,18 +18,6 @@ export const HarvestsView: React.FC = () => {
  useEffect(() => {
  loadHarvests();
  }, [version]);
-
- const handleStartEdit = (h: Harvest) => {
- setEditingId(h.id);
- setEditText(h.sourceText || '');
- };
-
- const handleSaveEdit = (id: string) => {
- dataService.updateHarvest(id, editText);
- setEditingId(null);
- showToast('Harvest source text updated!', 'success');
- loadHarvests();
- };
 
  return (
  <div className="max-w-6xl mx-auto py-6 px-4 space-y-6">
@@ -61,44 +45,9 @@ export const HarvestsView: React.FC = () => {
  </div>
  </div>
 
- {editingId === h.id ? (
- <div className="space-y-2">
- <label htmlFor={`harvest-edit-${h.id}`} className="sr-only">Edit harvest source text</label>
- <textarea
- id={`harvest-edit-${h.id}`}
- rows={5}
- value={editText}
- onChange={(e) => setEditText(e.target.value)}
- className="w-full bg-slate-900 font-mono text-sm p-3 text-indigo-600 border border-slate-700 rounded-lg focus:outline-none focus:border-indigo-500"
- />
- <div className="flex justify-end gap-2">
- <button
- onClick={() => setEditingId(null)}
- className="px-3 py-1 text-sm text-slate-500 hover:text-white"
- >
- Cancel
- </button>
- <button
- onClick={() => handleSaveEdit(h.id)}
- className="inline-flex items-center gap-1 px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg shadow-sm"
- >
- <Save className="w-3.5 h-3.5" />
- <span>Save Text</span>
- </button>
- </div>
- </div>
- ) : (
- <div className="relative group bg-slate-50 p-3 border border-slate-200 font-mono text-sm text-slate-700 whitespace-pre-line">
+ <div className="bg-slate-50 p-3 border border-slate-200 font-mono text-sm text-slate-700 whitespace-pre-line">
  {h.sourceText}
- <button
- onClick={() => handleStartEdit(h)}
- className="absolute top-2 right-2 p-1.5 bg-slate-800 border border-slate-700 rounded-md text-slate-400 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
- title="Edit Source Text"
- >
- <Edit3 className="w-3.5 h-3.5" />
- </button>
  </div>
- )}
 
  <div className="pt-2 flex justify-end">
  <Link

@@ -39,4 +39,32 @@ describe('LAC audit: assembly-ui dataService', () => {
     expect(dataService.getForums()).toEqual([]);
     expect(typeof (dataService as any).isMockMode).toBe('undefined');
   });
+
+  it('no dead mutation path: harvests expose no edit/update surface', async () => {
+    // Audit finding f5dafe8f: the UI previously offered a harvest source-text
+    // edit surface that called PATCH /harvests/:id — an endpoint neither
+    // nebula-srv nor assembly-srv implements (404 swallowed by the optimistic
+    // cache, false success toast). Harvests are append-only extraction records;
+    // the surface was removed. This pins: no updateHarvest export exists.
+    const api = await import('./apiClient');
+    expect(typeof (api as any).updateHarvest).toBe('undefined');
+    const { dataService } = await import('./dataService');
+    expect(typeof (dataService as any).updateHarvest).toBe('undefined');
+  });
+
+  it('every remaining mutation routes through the live api client', async () => {
+    // The mutation surface is: forums (create/reorder), threads (create),
+    // thread status, comments (create/edit/delete), feed (create/delete),
+    // open-questions (create + answers). Each dataService mutation must
+    // delegate to apiClient (live transport), never fabricate locally.
+    const api = await import('./apiClient');
+    for (const fn of [
+      'createForum', 'reorderForums', 'createThread', 'setThreadStatus',
+      'addComment', 'updateComment', 'deleteComment',
+      'createFeedPost', 'deleteFeedPost',
+      'createOpenQuestion', 'addQuestionAnswer',
+    ]) {
+      expect(typeof (api as any)[fn], `apiClient.${fn}`).toBe('function');
+    }
+  });
 });

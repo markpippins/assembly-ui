@@ -146,6 +146,47 @@ export async function updateComment(commentId: string, body: string) {
   });
 }
 
+// ── Decision cards (shrapnel-backed persistence) ──────────────────────
+// "Agreed selection:" submissions are stored as derived artifacts in the
+// shrapnel EAV object store via /api/decisions (assembly-srv). Saving is
+// best-effort fire-and-forget from the UI (the reply comment remains the
+// durable source of truth); GET re-hydrates the submitted state so cards
+// stay frozen across reloads.
+
+export interface DecisionSelection {
+  itemIdx: number;
+  label: string;
+  selected: boolean;
+  /** Free-text "Other" value entered for this item, when present. */
+  other?: string;
+}
+
+export interface DecisionPayload {
+  threadId: string;
+  /** 'thread' or the comment id the decision was made on. */
+  sourceId: string;
+  /** 'tasks' (checkbox) | 'choices' (radio). */
+  mode: string;
+  blockIdx: number;
+  selections: DecisionSelection[];
+  /** Comment id of the posted "Agreed selection:" reply. */
+  replyCommentId?: string | null;
+  submittedBy?: string | null;
+  submittedAt?: string | null;
+}
+
+export async function saveDecision(data: DecisionPayload) {
+  return request<any>(listUrl('/decisions'), {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function fetchDecisions(threadId: string): Promise<DecisionPayload[]> {
+  const result = await request<any[] | ListEnvelope<any>>(listUrl('/decisions', { threadId }));
+  return Array.isArray(result) ? result : result.items ?? [];
+}
+
 // DELETE /api/forums/comments/:id — soft-delete (expiration-based) a comment.
 export async function deleteComment(commentId: string) {
   return request<any>(listUrl(`/forums/comments/${commentId}`), { method: 'DELETE' });
@@ -219,13 +260,10 @@ export async function fetchCollectionItem(name: CollectionName, id: string): Pro
   }
 }
 
-// ── Harvests (has PATCH) ────────────────────────────────────────────
-export async function updateHarvest(id: string, data: { sourceText: string }) {
-  return request<any>(listUrl(`/harvests/${id}`), {
-    method: 'PATCH',
-    body: JSON.stringify(data),
-  });
-}
+// NOTE: there is no PATCH /harvests/:id on either backend (nebula-srv
+// documents GET/POST/DELETE only; assembly-srv proxies harvests read-only).
+// Harvests are append-only extraction records — the UI must not offer a
+// source-text edit surface that would silently 404. (LAC audit f5dafe8f)
 
 // ── Open Questions ──────────────────────────────────────────────────
 export async function fetchOpenQuestions(params?: Record<string, string>) {

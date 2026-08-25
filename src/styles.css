@@ -58,6 +58,26 @@ a {
   outline-offset: 2px;
 }
 
+/* ── Scroll stability while typing comments ───────────────────────────
+ * Thread pages reflow when comment bodies hydrate from the API (bodies
+ * arrive after first paint and push the page taller underneath a focused
+ * textarea). Anchoring the scroll container's overflow anchor at the
+ * bottom keeps the page pinned to the input while the content above it
+ * grows, so the box never jumps offscreen mid-typing. */
+main {
+  overflow-anchor: auto;
+}
+
+main textarea {
+  overflow-anchor: bottom;
+}
+
+/* An enlarged tap/press target keeps the composer reachable even when
+   the anchor re-pins the page (touch-friendly). */
+main textarea {
+  min-height: 44px;
+}
+
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;

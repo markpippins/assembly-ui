@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { dataService } from '../services/dataService';
+import { useLiveData } from './LiveDataContext';
 
 export interface RecentlyViewedItem {
   id: string;
@@ -34,21 +35,23 @@ export const RecentlyViewedProvider: React.FC<{ children: React.ReactNode }> = (
   });
 
   const location = useLocation();
+  const { version } = useLiveData();
+
+  const currentPath = location.pathname;
+  const currentParts = currentPath.split('/').filter(Boolean);
+  const currentCategory = currentParts[0];
+  const currentId = currentParts[currentParts.length - 1];
+  const isCurrentThread = currentCategory === 'forums' && currentParts.length === 3;
 
   // Automatically record entities visited based on current path
   useEffect(() => {
-    const path = location.pathname;
-    if (path === '/' || path === '/feed') return;
+    if (currentPath === '/' || currentPath === '/feed') return;
 
     // Check if path matches entity routes like /work-requests/WR-101 or /open-questions/OQ-102 or /forums/infra/thread-1
-    const parts = path.split('/').filter(Boolean);
-    if (parts.length >= 2) {
-      const category = parts[0];
-      const id = parts[parts.length - 1];
-
+    if (currentParts.length >= 2) {
       // Try searching entity in dataService
-      const results = dataService.searchAll(id);
-      const match = results.find((r) => r.href === path || r.id === id);
+      const results = dataService.searchAll(currentId);
+      const match = results.find((r) => r.href === currentPath || r.id === currentId);
 
       if (match) {
         addRecentlyViewed({
@@ -59,20 +62,88 @@ export const RecentlyViewedProvider: React.FC<{ children: React.ReactNode }> = (
         });
       } else {
         // Fallback title formatting
-        const formattedTitle = id
+        const formattedTitle = currentId
           .split('-')
           .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
           .join(' ');
 
-        addRecentlyViewed({
-          id,
-          title: `${category.replace('-', ' ').slice(0, -1).toUpperCase()}: ${formattedTitle}`,
-          type: category.replace('-', ' '),
-          path,
-        });
+        if (isCurrentThread) {
+          const res = dataService.getThread(currentId);
+          addRecentlyViewed({
+            id: currentId,
+            title: res.thread?.title ? res.thread.title : `FORUM: ${formattedTitle}`,
+            type: 'Thread',
+            path: currentPath,
+          });
+        } else {
+          addRecentlyViewed({
+            id: currentId,
+            title: `${currentCategory.replace('-', ' ').slice(0, -1).toUpperCase()}: ${formattedTitle}`,
+            type: currentCategory.replace('-', ' '),
+            path: currentPath,
+          });
+        }
       }
     }
-  }, [location.pathname]);
+  }, [currentPath, currentId, currentCategory, currentParts.length, isCurrentThread]);
+
+  // Dynamically resolve and update fallback titles when data loaded / cache updated
+  useEffect(() => {
+    if (!currentId || currentPath === '/' || currentPath === '/feed') return;
+
+    setRecentlyViewed((prev) => {
+      const itemIdx = prev.findIndex((i) => i.id === currentId);
+      if (itemIdx === -1) return prev;
+
+      const item = prev[itemIdx];
+      const isFallback =
+        item.title.startsWith('FORUM:') ||
+        item.title.startsWith('WORK REQUEST:') ||
+        item.title.startsWith('REQUIREMENT:') ||
+        item.title.startsWith('AGENDA:') ||
+        item.title.startsWith('CANDIDATE:') ||
+        item.title.startsWith('HARVEST:') ||
+        item.title.startsWith('OPEN QUESTION:') ||
+        item.title.startsWith('ASSESSMENT:') ||
+        item.title.startsWith('OBSERVATION:') ||
+        item.title.startsWith('AGENT RECORD:') ||
+        item.title.startsWith('SPECIFICATION:') ||
+        item.title.startsWith('PLAN:');
+
+      if (!isFallback) return prev;
+
+      let resolvedTitle = '';
+      if (isCurrentThread) {
+        const res = dataService.getThread(currentId);
+        if (res.thread && res.thread.title) {
+          resolvedTitle = res.thread.title;
+        }
+      } else {
+        const results = dataService.searchAll(currentId);
+        const match = results.find((r) => r.href === currentPath || r.id === currentId);
+        if (match && match.title) {
+          resolvedTitle = match.title;
+        }
+      }
+
+      if (resolvedTitle && resolvedTitle !== item.title) {
+        const updated = [...prev];
+        updated[itemIdx] = {
+          ...item,
+          title: resolvedTitle,
+          type: isCurrentThread ? 'Thread' : item.type,
+        };
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+        } catch {
+          // Ignore
+        }
+        return updated;
+      }
+
+      return prev;
+    });
+  }, [version, currentId, isCurrentThread, currentPath]);
 
   const addRecentlyViewed = (item: Omit<RecentlyViewedItem, 'timestamp'>) => {
     setRecentlyViewed((prev) => {
@@ -81,7 +152,7 @@ export const RecentlyViewedProvider: React.FC<{ children: React.ReactNode }> = (
       const updated = [
         { ...item, timestamp: Date.now() },
         ...filtered,
-      ].slice(0, 10); // Keep top 10
+      ].slice(0, 25); // Keep top 25
 
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
@@ -105,7 +176,7 @@ export const RecentlyViewedProvider: React.FC<{ children: React.ReactNode }> = (
   return (
     <RecentlyViewedContext.Provider
       value={{
-        recentlyViewed: recentlyViewed.slice(0, 5), // Return last 5
+        recentlyViewed: recentlyViewed.slice(0, 15), // Return last 15
         addRecentlyViewed,
         clearRecentlyViewed,
       }}
