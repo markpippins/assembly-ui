@@ -36,7 +36,7 @@ export interface ChoiceItem {
 export type Segment =
  | { type: 'markdown'; content: string }
  | { type: 'tasks'; blockIdx: number; items: TaskItem[] }
- | { type: 'choices'; blockIdx: number; items: ChoiceItem[] };
+ | { type: 'choices'; blockIdx: number; items: ChoiceItem[]; header?: string };
 
 const TASK_LINE_RE = /^\s*[-*]\s+\[([ xX])\][ \t]*(.*)$/;
 const CHOICE_LINE_RE = /^\s*[-*]\s+\(([ xX])\)[ \t]*(.*)$/;
@@ -77,7 +77,32 @@ export function splitSegments(content: string): Segment[] {
  }),
  });
  } else {
+ // Card-with-header support (promotion-gate batch format): a block whose
+ // leading line(s) are bold card headers followed by ALL radio-choice
+ // lines is one decision card — the header renders above the radios.
+ // Without this, the header line poisons the block into plain markdown
+ // and the operator sees raw parens instead of usable cards.
+ const firstChoice = lines.findIndex((l) => CHOICE_LINE_RE.test(l));
+ const headLines = firstChoice > 0 ? lines.slice(0, firstChoice) : [];
+ const restAllChoices =
+ firstChoice > 0 && lines.slice(firstChoice).every((l) => CHOICE_LINE_RE.test(l));
+ const headersOk =
+ headLines.length > 0 &&
+ headLines.length <= 2 &&
+ headLines.every((l) => /^\*\*.+\*\*/.test(l.trim()));
+ if (restAllChoices && headersOk) {
+ segments.push({
+ type: 'choices',
+ blockIdx: blockIdx++,
+ header: headLines.join(' '),
+ items: lines.slice(firstChoice).map((l) => {
+ const m = l.match(CHOICE_LINE_RE)!;
+ return { text: m[2], initiallySelected: m[1].toLowerCase() === 'x' };
+ }),
+ });
+ } else {
  segments.push({ type: 'markdown', content: block });
+ }
  }
  }
  return segments;
@@ -236,6 +261,9 @@ export const InteractiveMarkdown: React.FC<InteractiveMarkdownProps> = ({
  const selected = radioMap?.[blockKey] ?? (initialIdx >= 0 ? initialIdx : -1);
  return (
  <div key={i} role="radiogroup" className="choice-list space-y-0.5 my-1.5" aria-label={`Decision ${seg.blockIdx + 1}`}>
+ {'header' in seg && seg.header && (
+ <MarkdownRenderer content={seg.header} />
+ )}
  {seg.items.map((item, j) => {
  const key = `${sourceId}:${seg.blockIdx}:${j}`;
  const isSelected = selected === j;
