@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Send, CornerDownRight, CheckCircle2, Pencil, Trash2 } from 'lucide-react';
 import { Avatar } from '../components/Avatar';
@@ -33,10 +33,14 @@ export const ThreadDetailView: React.FC = () => {
  const [submittedFor, setSubmittedFor] = useState<Set<string>>(new Set());
  // Persisted decision-card state re-hydrated from shrapnel after reload:
  // sources whose submitted decision records exist on the server.
- const [persistedSubmissions, setPersistedSubmissions] = useState<
-   Record<string, { mode: string; blockIdx: number; selections: api.DecisionSelection[] }[]>
- >({});
- const { showToast } = useToast();
+  const [persistedSubmissions, setPersistedSubmissions] = useState<
+    Record<string, { mode: string; blockIdx: number; selections: api.DecisionSelection[] }[]>
+  >({});
+  // [candidate-drilldown] Promotion-batch support: candidates index keyed by
+  // 8-hex prefix → candidate record. Loaded lazily when the thread body looks
+  // like a promotion batch; drives link decoration + status badges.
+  const [candIndex, setCandIndex] = useState<Record<string, any>>({});
+  const { showToast } = useToast();
 
  const loadData = () => {
  console.log('[tdv] loadData start ' + JSON.stringify({ slug, threadId }));
@@ -106,7 +110,46 @@ export const ThreadDetailView: React.FC = () => {
    // eslint-disable-next-line react-hooks/exhaustive-deps
  }, [threadId]);
 
- const handlePostComment = (e: React.FormEvent, parentId?: string | null) => {
+  // [candidate-drilldown] Load the candidates index when this thread is a
+  // promotion batch (headers of the form **Card `xxxxxxxx`**). Progressive:
+  // badges appear as pages land.
+  useEffect(() => {
+    if (!thread?.body?.includes('**Card `')) return;
+    let cancelled = false;
+    api.fetchCandidatesIndex().then((idx) => {
+      if (!cancelled) setCandIndex(idx);
+    }).catch(() => { /* nebula unreachable — cards render undecorated */ });
+    return () => { cancelled = true; };
+  }, [thread?.body]);
+
+  // [candidate-drilldown] Decorate promotion-card headers at render time:
+  //  - backticked 8-hex prefix becomes a link to /candidates/<uuid> (with
+  //    ?thread= so the detail view can echo verdicts back to THIS batch)
+  //  - current candidate status appended as a badge → decisions made anywhere
+  //    (detail view, stage3 execution) are reflected on revisit. The thread
+  //    body itself is never mutated — decoration is render-time only.
+  const decoratedThreadBody = useMemo(() => {
+    const body = thread?.body;
+    if (!body || !body.includes('**Card `')) return body;
+    return body.split('\n').map((line) => {
+      const m = line.match(/^\*\*Card `([0-9a-f]{8})`\*\* — (.*)$/);
+      if (!m) return line;
+      const short = m[1].toLowerCase();
+      const cand = candIndex[short];
+      const uuid = cand?.id ?? short;
+      const href = `/candidates/${uuid}${threadId ? `?thread=${threadId}` : ''}`;
+      const badge =
+        cand?.status === 'promoted' ? '✅ promoted'
+        : cand?.status === 'struck' ? '⛔ struck'
+        : cand?.status === 'discarded' ? '⛔ struck'
+        : cand?.status === 'approved' ? '🔎 approved · pending execution'
+        : '';
+      const badgePart = badge ? ` · ${badge}` : '';
+      return `**[Card \`${short}\`](${href}) — ${m[2]}${badgePart}**`;
+    }).join('\n');
+  }, [thread?.body, candIndex, threadId]);
+
+  const handlePostComment = (e: React.FormEvent, parentId?: string | null) => {
  e.preventDefault();
  if (!replyText.trim() || !threadId) return;
 
@@ -478,18 +521,21 @@ export const ThreadDetailView: React.FC = () => {
  <span className="ml-1">{formatDateTime(thread.createdAt)}</span>
  </div>
  </div>
- <div className="mt-4">
- <InteractiveMarkdown
- content={thread.body}
- sourceId="thread"
- checkedMap={checkedTasks}
- onToggle={handleTaskToggle}
- radioMap={radioTasks}
- onRadio={handleRadioToggle}
- otherMap={otherTexts}
- onOtherChange={handleOtherChange}
- disabled={submittedFor.has('thread')}
- />
+  <div className="mt-4">
+  {/* [candidate-drilldown] decoratedThreadBody adds per-candidate links +
+      status badges; selection/verdict machinery below keeps using the raw
+      thread.body so submitted labels stay byte-identical for stage3. */}
+  <InteractiveMarkdown
+  content={decoratedThreadBody ?? thread.body}
+  sourceId="thread"
+  checkedMap={checkedTasks}
+  onToggle={handleTaskToggle}
+  radioMap={radioTasks}
+  onRadio={handleRadioToggle}
+  otherMap={otherTexts}
+  onOtherChange={handleOtherChange}
+  disabled={submittedFor.has('thread')}
+  />
  {/* [bulk-verdict] bulk actions above card list (to-do d9ac7608) */}
  <BulkVerdictBar
  threadBody={thread.body}

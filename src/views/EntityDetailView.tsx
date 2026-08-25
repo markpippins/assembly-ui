@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useParams, Link, useLocation } from 'react-router-dom';
+import { useParams, Link, useLocation, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Database, FileCode, CheckCircle2 } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
 import { MarkdownRenderer } from '../components/MarkdownRenderer';
+import { CandidateGatePanel } from '../components/CandidateGatePanel'; // [candidate-drilldown]
 import { dataService } from '../services/dataService';
 import { useLiveData } from '../context/LiveDataContext';
 import { formatDateTime } from '../utils/format';
@@ -295,68 +296,92 @@ function getItemBody(item: Record<string, unknown>): string {
 }
 
 export const EntityDetailView: React.FC = () => {
- const { id } = useParams<{ id: string }>();
- const location = useLocation();
- const { version } = useLiveData();
- const [entityData, setEntityData] = useState<any>(null);
- const [entityType, setEntityType] = useState<string>('Entity');
- const [agendaItems, setAgendaItems] = useState<any[]>([]);
- const [segmentSets, setSegmentSets] = useState<any[]>([]);
- const [showDockLang, setShowDockLang] = useState(false);
+  const { id } = useParams<{ id: string }>();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const { version } = useLiveData();
+  const [entityData, setEntityData] = useState<any>(null);
+  const [entityType, setEntityType] = useState<string>('Entity');
+  const [agendaItems, setAgendaItems] = useState<any[]>([]);
+  const [segmentSets, setSegmentSets] = useState<any[]>([]);
+  const [showDockLang, setShowDockLang] = useState(false);
 
- useEffect(() => {
- if (!id) return;
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
 
- const path = location.pathname;
- let data: any = null;
- let type = 'Entity';
+    const path = location.pathname;
+    let data: any = null;
+    let type = 'Entity';
 
- if (path.includes('/requirements')) {
- data = dataService.getRequirement(id);
- type = 'Requirement';
- } else if (path.includes('/agendas')) {
- data = dataService.getAgenda(id);
- type = 'Agenda';
- } else if (path.includes('/candidates')) {
- data = dataService.getCandidate(id);
- type = 'Candidate';
- } else if (path.includes('/harvests')) {
- data = dataService.getHarvest(id);
- type = 'Harvest';
- } else if (path.includes('/assessments')) {
- data = dataService.getAssessment(id);
- type = 'Assessment';
- } else if (path.includes('/observations')) {
- data = dataService.getObservation(id);
- type = 'Observation';
- } else if (path.includes('/agent-records') || path.includes('/reports')) {
- data = dataService.getAgentRecord(id);
- type = 'Agent Record';
- } else if (path.includes('/specs')) {
- data = dataService.getSpecItem(id);
- type = 'Spec Item';
- }
+    const load = async () => {
+      // [candidate-drilldown] Accept 8-hex candidate id prefixes (promotion
+      // cards link with full uuids, but manual/legacy short URLs work too).
+      let effectiveId = id;
+      if (path.includes('/candidates') && id.length !== 36) {
+        try {
+          const idx = await api.fetchCandidatesIndex();
+          const hit = idx[id.toLowerCase()];
+          if (hit?.id) effectiveId = hit.id;
+        } catch { /* index unavailable — fall through */ }
+      }
 
- setEntityData(data);
- setEntityType(type);
- setAgendaItems([]);
- setSegmentSets([]);
- setShowDockLang(false);
+      if (path.includes('/requirements')) {
+        data = dataService.getRequirement(effectiveId);
+        type = 'Requirement';
+      } else if (path.includes('/agendas')) {
+        data = dataService.getAgenda(effectiveId);
+        type = 'Agenda';
+      } else if (path.includes('/candidates')) {
+        data = dataService.getCandidate(effectiveId);
+        type = 'Candidate';
+        // Live cache may be cold/stale — prefer a fresh nebula read.
+        try {
+          const fresh = await api.fetchCollectionItem('candidates', effectiveId);
+          if (fresh) data = fresh;
+        } catch { /* keep cache fallback */ }
+      } else if (path.includes('/harvests')) {
+        data = dataService.getHarvest(effectiveId);
+        type = 'Harvest';
+      } else if (path.includes('/assessments')) {
+        data = dataService.getAssessment(effectiveId);
+        type = 'Assessment';
+      } else if (path.includes('/observations')) {
+        data = dataService.getObservation(effectiveId);
+        type = 'Observation';
+      } else if (path.includes('/agent-records') || path.includes('/reports')) {
+        data = dataService.getAgentRecord(effectiveId);
+        type = 'Agent Record';
+      } else if (path.includes('/specs')) {
+        data = dataService.getSpecItem(effectiveId);
+        type = 'Spec Item';
+      }
 
- // Sub-collections (mirrors Angular loadSubCollections)
- if (type === 'Agenda' && id) {
- if (data && Array.isArray(data.items)) setAgendaItems(data.items);
- api.fetchAgendaItems(id).then((fetched) => {
- if (fetched && fetched.length > 0) setAgendaItems(fetched);
- }).catch(() => {});
- }
- // Segment sets for candidates (fetched from substance-srv by harvest_id)
- if (type === 'Candidate' && data?.harvestId) {
- api.fetchSegmentSetsForHarvest(data.harvestId).then((sets) => {
- if (sets.length > 0) setSegmentSets(sets);
- }).catch(() => {});
- }
- }, [id, location, version]);
+      if (cancelled) return;
+      setEntityData(data);
+      setEntityType(type);
+      setAgendaItems([]);
+      setSegmentSets([]);
+      setShowDockLang(false);
+
+      // Sub-collections (mirrors Angular loadSubCollections)
+      if (type === 'Agenda' && effectiveId) {
+        if (data && Array.isArray(data.items)) setAgendaItems(data.items);
+        api.fetchAgendaItems(effectiveId).then((fetched) => {
+          if (!cancelled && fetched && fetched.length > 0) setAgendaItems(fetched);
+        }).catch(() => {});
+      }
+      // Segment sets for candidates (fetched from substance-srv by harvest_id)
+      if (type === 'Candidate' && data?.harvestId) {
+        api.fetchSegmentSetsForHarvest(data.harvestId).then((sets) => {
+          if (!cancelled && sets.length > 0) setSegmentSets(sets);
+        }).catch(() => {});
+      }
+    };
+
+    load();
+    return () => { cancelled = true; };
+  }, [id, location, version]);
 
  const metadataEntries = useMemo(() => {
  if (!entityData) return [];
@@ -396,11 +421,21 @@ export const EntityDetailView: React.FC = () => {
  <Link to={location.pathname} className="text-slate-900 font-mono hover:text-indigo-600 :text-indigo-400 hover:underline">{id}</Link>
  </div>
 
- <PageHeader
- title={title}
- subtitle={`${entityType} detail`}
- ttsContent={`${entityType} ${title}. ${entityData.description || entityData.content || ''}`}
- />
+  <PageHeader
+  title={title}
+  subtitle={`${entityType} detail`}
+  ttsContent={`${entityType} ${title}. ${entityData.description || entityData.content || ''}`}
+  />
+
+  {/* [candidate-drilldown] Promotion gate: per-candidate approve/strike/comment.
+      ?thread=<batchThreadId> (added by batch-card links) echoes the verdict into
+      that thread as a parseable Agreed-selection comment. */}
+  {entityType === 'Candidate' && entityData?.id && (
+  <CandidateGatePanel
+  candidateId={id!}
+  onStatusChange={(next) => setEntityData((prev: any) => ({ ...prev, status: next }))}
+  />
+  )}
 
  <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
  {/* Main column */}

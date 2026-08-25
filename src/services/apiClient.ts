@@ -457,3 +457,36 @@ export async function fetchSegmentSetsForHarvest(harvestId: string): Promise<Seg
     return [];
   }
 }
+
+// ── Harvest candidates (promotion gate) ─────────────────────────────
+// PATCH /nebula/harvest-candidates/:id — update candidate status/metadata
+// (proxied by vite to nebula-srv :3101; verified live 2026-08-25).
+export async function updateHarvestCandidate(id: string, patch: Record<string, unknown>) {
+  return request<any>(listUrl(`/harvest-candidates/${id}`, undefined, '/nebula'), {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
+  });
+}
+
+// Module-level index of all harvest candidates keyed by lowercase 8-char id
+// prefix. Promotion-batch threads reference candidates by 8-hex prefix only,
+// so resolving prefix → {uuid, status, …} needs the full collection. Cached
+// for TTL seconds to avoid re-paginating (~18 × 500) on every visit.
+let candIndexPromise: Promise<Record<string, any>> | null = null;
+let candIndexAt = 0;
+const CAND_INDEX_TTL_MS = 5 * 60 * 1000;
+
+export function fetchCandidatesIndex(force = false): Promise<Record<string, any>> {
+  const now = Date.now();
+  if (!force && candIndexPromise && now - candIndexAt < CAND_INDEX_TTL_MS) return candIndexPromise;
+  candIndexAt = now;
+  candIndexPromise = (async () => {
+    const items = await listAll<any>('/harvest-candidates', undefined, '/nebula', 500);
+    const idx: Record<string, any> = {};
+    for (const c of items) {
+      if (typeof c?.id === 'string' && c.id.length >= 8) idx[c.id.slice(0, 8).toLowerCase()] = c;
+    }
+    return idx;
+  })();
+  return candIndexPromise;
+}
