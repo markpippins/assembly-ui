@@ -34,7 +34,7 @@ export interface Thread {
 // ── Thread status vocabulary (assembly.posts.rating) ────────────────
 // Canonical mapping shared with assembly-srv routes/forums.js and the
 // backfill script — keep all three in sync.
-export type ThreadStatus = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
+export type ThreadStatus = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
 export interface ThreadStatusMeta {
   value: ThreadStatus;
@@ -52,6 +52,10 @@ export const THREAD_STATUSES: Record<ThreadStatus, ThreadStatusMeta> = {
   5: { value: 5, label: 'Rejected', color: 'bg-red-500' },
   6: { value: 6, label: 'Reopened', color: 'bg-purple-500' },
   7: { value: 7, label: 'Closed', color: 'bg-gray-500' },
+  // 8 Approved — INTERIM scheme (2026-08-25): operator approval of a
+  // posted To Do marks it a candidate -> in flight, awaiting requirement
+  // conversion. Interim until Wind doctrine supersedes the rating ladder.
+  8: { value: 8, label: 'Approved', color: 'bg-teal-500' },
 };
 
 export const THREAD_STATUS_LIST: ThreadStatusMeta[] = Object.values(THREAD_STATUSES);
