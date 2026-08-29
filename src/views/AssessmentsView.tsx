@@ -6,6 +6,7 @@ import { StatusBadge } from '../components/StatusBadge';
 import { dataService } from '../services/dataService';
 import { useLiveData } from '../context/LiveDataContext';
 import { formatDateTime } from '../utils/format';
+import { idBadge, entityLabel } from '../utils/idFormat';
 import { Assessment } from '../types';
 
 export const AssessmentsView: React.FC = () => {
@@ -37,15 +38,15 @@ export const AssessmentsView: React.FC = () => {
  Confidence: {a.confidence ? `${(a.confidence * 100).toFixed(0)}%` : 'N/A'}
  </span>
  </div>
- <Link to={`/assessments/${a.id}`} className="font-mono text-[11px] text-indigo-600 hover:underline">{a.id}</Link>
+ <Link to={`/assessments/${a.id}`} className="font-mono text-[11px] text-indigo-600 hover:underline">{idBadge(a.id)}</Link>
  </div>
 
- <h2 className="text-base font-bold text-slate-900 font-poppins">Assessment for Observation: {a.observationId}</h2>
+ <h2 className="text-base font-bold text-slate-900 font-poppins">Assessment for: <Link to={`/observations/${a.observationId}`} className="text-indigo-600 hover:underline">{entityLabel(a.observationId, 'observation')}</Link></h2>
  {a.analysisDetail && <p className="text-sm text-slate-700 bg-slate-50 p-3 rounded-lg border border-slate-200 ">{a.analysisDetail}</p>}
 
  <div className="pt-3 border-t border-slate-200 flex items-center justify-between text-sm font-mono text-slate-500 ">
  <span>
- <span className="mr-3">Agenda Ref: {a.agendaId || 'N/A'}</span>
+ <span className="mr-3">Agenda: {a.agendaId ? <Link to={`/agendas/${a.agendaId}`} className="text-indigo-600 hover:underline">{entityLabel(a.agendaId, 'agenda')}</Link> : 'N/A'}</span>
  <span>{formatDateTime(a.createdAt)}</span>
  </span>
  <Link

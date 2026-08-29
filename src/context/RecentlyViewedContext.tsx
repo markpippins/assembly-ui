@@ -60,29 +60,29 @@ export const RecentlyViewedProvider: React.FC<{ children: React.ReactNode }> = (
           type: match.type,
           path: match.href,
         });
+      } else if (isCurrentThread) {
+        // Forum thread: try to get the title from cache; if not cached yet,
+        // the async fetch fires inside getThread and the second useEffect
+        // below will resolve the title when the data version bumps.
+        const res = dataService.getThread(currentId);
+        addRecentlyViewed({
+          id: currentId,
+          title: res.thread?.title ?? '',
+          type: 'Thread',
+          path: currentPath,
+        });
       } else {
         // Fallback title formatting
         const formattedTitle = currentId
           .split('-')
           .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
           .join(' ');
-
-        if (isCurrentThread) {
-          const res = dataService.getThread(currentId);
-          addRecentlyViewed({
-            id: currentId,
-            title: res.thread?.title ? res.thread.title : `FORUM: ${formattedTitle}`,
-            type: 'Thread',
-            path: currentPath,
-          });
-        } else {
-          addRecentlyViewed({
-            id: currentId,
-            title: `${currentCategory.replace('-', ' ').slice(0, -1).toUpperCase()}: ${formattedTitle}`,
-            type: currentCategory.replace('-', ' '),
-            path: currentPath,
-          });
-        }
+        addRecentlyViewed({
+          id: currentId,
+          title: formattedTitle,
+          type: currentCategory.replace('-', ' '),
+          path: currentPath,
+        });
       }
     }
   }, [currentPath, currentId, currentCategory, currentParts.length, isCurrentThread]);
@@ -96,7 +96,9 @@ export const RecentlyViewedProvider: React.FC<{ children: React.ReactNode }> = (
       if (itemIdx === -1) return prev;
 
       const item = prev[itemIdx];
+      // Re-resolve whenever the title is empty or still a raw fallback
       const isFallback =
+        !item.title ||
         item.title.startsWith('FORUM:') ||
         item.title.startsWith('WORK REQUEST:') ||
         item.title.startsWith('REQUIREMENT:') ||

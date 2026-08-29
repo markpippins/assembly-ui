@@ -6,6 +6,7 @@ import { StatusBadge } from '../components/StatusBadge';
 import { dataService } from '../services/dataService';
 import { useLiveData } from '../context/LiveDataContext';
 import { formatDateTime } from '../utils/format';
+import { idBadge } from '../utils/idFormat';
 import { Plan } from '../types';
 
 export const PlansView: React.FC = () => {
@@ -32,7 +33,7 @@ export const PlansView: React.FC = () => {
  <StatusBadge status={plan.status} />
  <span className="font-mono text-sm text-indigo-600 font-bold">{plan.project}</span>
  </div>
- <Link to={`/plans/${plan.id}`} className="font-mono text-[11px] text-indigo-600 hover:underline">{plan.id}</Link>
+ <Link to={`/plans/${plan.id}`} className="font-mono text-[11px] text-indigo-600 hover:underline">{idBadge(plan.id)}</Link>
  </div>
 
  <h2 className="text-base font-bold text-slate-900 font-poppins">{plan.title}</h2>

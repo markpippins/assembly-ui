@@ -6,6 +6,7 @@ import { StatusBadge } from '../components/StatusBadge';
 import { dataService } from '../services/dataService';
 import { useLiveData } from '../context/LiveDataContext';
 import { formatDateTime } from '../utils/format';
+import { idBadge } from '../utils/idFormat';
 import { OpenQuestion } from '../types';
 
 export const ResolutionsView: React.FC = () => {
@@ -45,7 +46,7 @@ export const ResolutionsView: React.FC = () => {
  {q.category}
  </span>
  </div>
- <Link to={`/open-questions/${q.id}`} className="font-mono text-[11px] text-indigo-600 hover:underline">{q.id}</Link>
+ <Link to={`/open-questions/${q.id}`} className="font-mono text-[11px] text-indigo-600 hover:underline">{idBadge(q.id)}</Link>
  </div>
 
  <h2 className="text-base font-bold text-slate-900 font-poppins">{q.title}</h2>

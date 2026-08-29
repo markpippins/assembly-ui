@@ -5,6 +5,7 @@ import { PageHeader } from '../components/PageHeader';
 import { dataService } from '../services/dataService';
 import { useLiveData } from '../context/LiveDataContext';
 import { formatDateTime } from '../utils/format';
+import { idBadge } from '../utils/idFormat';
 import { Harvest } from '../types';
 
 export const HarvestsView: React.FC = () => {
@@ -34,7 +35,7 @@ export const HarvestsView: React.FC = () => {
  <div className="flex items-center gap-3">
  <FileCode className="w-5 h-5 text-emerald-600 " />
  <div>
- <h2 className="text-sm font-bold text-slate-900 font-mono"><Link to={`/harvests/${h.id}`} className="hover:text-indigo-600 :text-indigo-400 transition-colors">{h.sourceFilename || h.id}</Link></h2>
+ <h2 className="text-sm font-bold text-slate-900 font-mono"><Link to={`/harvests/${h.id}`} className="hover:text-indigo-600 :text-indigo-400 transition-colors">{h.sourceFilename || idBadge(h.id)}</Link></h2>
  <p className="text-[11px] text-slate-400 font-mono">Model: {h.model || 'Unknown'}</p>
  </div>
  </div>

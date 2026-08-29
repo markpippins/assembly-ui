@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Clock, Trash2, ArrowRight, Sparkles, FileText } from 'lucide-react';
 import { useRecentlyViewed } from '../context/RecentlyViewedContext';
+import { shortId } from '../utils/idFormat';
 
 export const RecentlyViewedDropdown: React.FC = () => {
  const { recentlyViewed, clearRecentlyViewed } = useRecentlyViewed();
@@ -74,7 +75,7 @@ export const RecentlyViewedDropdown: React.FC = () => {
  </div>
  <div className="truncate">
  <div className="text-sm font-semibold text-slate-800 truncate group-hover:text-indigo-600 :text-indigo-400 transition-colors">
- {item.title}
+ {item.title || shortId(item.id)}
  </div>
  <div className="text-[10px] font-mono text-slate-400 uppercase tracking-wider">
  {item.type}

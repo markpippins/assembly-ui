@@ -7,6 +7,7 @@ import { MarkdownRenderer } from '../components/MarkdownRenderer';
 import { dataService } from '../services/dataService';
 import { useLiveData } from '../context/LiveDataContext';
 import { formatDateTime } from '../utils/format';
+import { idBadge, entityLabel } from '../utils/idFormat';
 import { WorkRequest } from '../types';
 
 export const WorkRequestDetailView: React.FC = () => {
@@ -40,12 +41,12 @@ export const WorkRequestDetailView: React.FC = () => {
  <span>Work Requests</span>
  </Link>
  <span>/</span>
- <Link to={`/work-requests/${wr.id}`} className="text-slate-900 font-mono hover:text-indigo-600 :text-indigo-400 hover:underline">{wr.id}</Link>
+ <Link to={`/work-requests/${wr.id}`} className="text-slate-900 font-mono hover:text-indigo-600 :text-indigo-400 hover:underline">{idBadge(wr.id)}</Link>
  </div>
 
  <PageHeader
  title={wr.title}
- subtitle={<>ID: <Link to={`/work-requests/${wr.id}`} className="text-indigo-600 hover:underline font-mono">{wr.id}</Link></>}
+ subtitle={<>ID: <Link to={`/work-requests/${wr.id}`} className="text-indigo-600 hover:underline font-mono">{idBadge(wr.id)}</Link></>}
  ttsContent={`Work Request ${wr.title}. Status ${wr.status}. Intent: ${wr.intent || 'None'}.`}
  action={<StatusBadge status={wr.status} size="md" />}
  />
@@ -89,8 +90,8 @@ export const WorkRequestDetailView: React.FC = () => {
  {wr.sourceSpecificationId && (
  <div>
  <span className="text-slate-400 block text-[11px]">Source Specification</span>
- <Link to={`/specifications/${wr.sourceSpecificationId}`} className="text-indigo-400 hover:underline font-mono">
- {wr.sourceSpecificationId}
+ <Link to={`/specifications/${wr.sourceSpecificationId}`} className="text-indigo-400 hover:underline font-medium">
+ {entityLabel(wr.sourceSpecificationId, 'specification')}
  </Link>
  </div>
  )}
@@ -98,8 +99,8 @@ export const WorkRequestDetailView: React.FC = () => {
  {wr.sourceRequirementId && (
  <div>
  <span className="text-slate-400 block text-[11px]">Source Requirement</span>
- <Link to={`/requirements/${wr.sourceRequirementId}`} className="text-indigo-400 hover:underline font-mono">
- {wr.sourceRequirementId}
+ <Link to={`/requirements/${wr.sourceRequirementId}`} className="text-indigo-400 hover:underline font-medium">
+ {entityLabel(wr.sourceRequirementId, 'requirement')}
  </Link>
  </div>
  )}

@@ -6,6 +6,7 @@ import { StatusBadge } from '../components/StatusBadge';
 import { dataService } from '../services/dataService';
 import { useLiveData } from '../context/LiveDataContext';
 import { formatDateTime } from '../utils/format';
+import { idBadge } from '../utils/idFormat';
 import { Candidate } from '../types';
 
 export const CandidatesView: React.FC = () => {
@@ -33,7 +34,7 @@ export const CandidatesView: React.FC = () => {
  <div className="flex flex-wrap items-center justify-between gap-3">
  <div className="flex items-center gap-3">
  <StatusBadge status={cand.status} />
- <RouterLink to={`/candidates/${cand.id}`} className="font-mono text-sm text-indigo-600 hover:underline">{cand.id}</RouterLink>
+ <RouterLink to={`/candidates/${cand.id}`} className="font-mono text-sm text-indigo-600 hover:underline">{idBadge(cand.id)}</RouterLink>
  </div>
  <div className="flex items-center gap-2 font-mono text-sm text-indigo-600 ">
  <span>Readiness:</span>

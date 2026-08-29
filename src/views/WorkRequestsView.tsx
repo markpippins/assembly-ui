@@ -6,6 +6,7 @@ import { StatusBadge } from '../components/StatusBadge';
 import { dataService } from '../services/dataService';
 import { useLiveData } from '../context/LiveDataContext';
 import { formatDateTime } from '../utils/format';
+import { idBadge } from '../utils/idFormat';
 import { WorkRequest } from '../types';
 
 export const WorkRequestsView: React.FC = () => {
@@ -67,7 +68,7 @@ export const WorkRequestsView: React.FC = () => {
  <Link to={`/work-requests/${wr.id}`} className="font-bold text-slate-900 hover:text-indigo-600 :text-indigo-600 transition-colors">
  {wr.title}
  </Link>
- <Link to={`/work-requests/${wr.id}`} className="font-mono text-[10px] text-indigo-600 hover:underline">{wr.id}</Link>
+ <Link to={`/work-requests/${wr.id}`} className="font-mono text-[10px] text-indigo-600 hover:underline">{idBadge(wr.id)}</Link>
  </div>
  </td>
  <td className="py-3 px-4 text-slate-600 ">{wr.intent || '—'}</td>

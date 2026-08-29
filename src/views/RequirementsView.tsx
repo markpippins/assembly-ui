@@ -6,6 +6,7 @@ import { StatusBadge } from '../components/StatusBadge';
 import { dataService } from '../services/dataService';
 import { useLiveData } from '../context/LiveDataContext';
 import { formatDateTime } from '../utils/format';
+import { idBadge } from '../utils/idFormat';
 import { Requirement } from '../types';
 
 export const RequirementsView: React.FC = () => {
@@ -46,7 +47,7 @@ export const RequirementsView: React.FC = () => {
  <Link to={`/requirements/${req.id}`} className="font-bold text-slate-900 hover:text-indigo-600 :text-indigo-300 transition-colors">
  {req.title || 'Untitled Requirement'}
  </Link>
- <Link to={`/requirements/${req.id}`} className="font-mono text-[10px] text-indigo-600 hover:underline">{req.id}</Link>
+ <Link to={`/requirements/${req.id}`} className="font-mono text-[10px] text-indigo-600 hover:underline">{idBadge(req.id)}</Link>
  </div>
  </td>
  <td className="py-3 px-4 text-slate-600 font-mono text-[11px] uppercase">{req.reqType || 'FUNCTIONAL'}</td>

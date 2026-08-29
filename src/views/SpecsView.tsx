@@ -5,6 +5,7 @@ import { PageHeader } from '../components/PageHeader';
 import { dataService } from '../services/dataService';
 import { useLiveData } from '../context/LiveDataContext';
 import { formatDateTime } from '../utils/format';
+import { idBadge } from '../utils/idFormat';
 import { SpecItem } from '../types';
 
 export const SpecsView: React.FC = () => {
@@ -37,7 +38,7 @@ export const SpecsView: React.FC = () => {
  </span>
  )}
  </div>
- <Link to={`/specs/${item.id}`} className="font-mono text-[11px] text-indigo-600 hover:underline">{item.id}</Link>
+ <Link to={`/specs/${item.id}`} className="font-mono text-[11px] text-indigo-600 hover:underline">{idBadge(item.id)}</Link>
  </div>
 
  <h2 className="text-base font-bold text-slate-900 font-poppins">{item.title}</h2>

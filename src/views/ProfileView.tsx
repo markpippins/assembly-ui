@@ -7,6 +7,7 @@ import { MarkdownRenderer } from '../components/MarkdownRenderer';
 import { dataService } from '../services/dataService';
 import { useLiveData } from '../context/LiveDataContext';
 import { formatDateTime } from '../utils/format';
+import { idBadge } from '../utils/idFormat';
 import { User, FeedPost } from '../types';
 
 export const ProfileView: React.FC = () => {
@@ -55,7 +56,7 @@ export const ProfileView: React.FC = () => {
  <Avatar name={user.name} email={user.email ?? undefined} avatar={user.avatar} size="xl" showStatus={true} />
  <div>
  <h2 className="text-lg font-bold text-slate-900 font-poppins">{user.name}</h2>
- <p className="text-sm text-indigo-600 font-mono">Contributor ID: <Link to={`/profile/${user.id}`} className="text-indigo-600 hover:underline">{user.id}</Link></p>
+ <p className="text-sm text-indigo-600 font-mono">Contributor: <Link to={`/profile/${user.id}`} className="text-indigo-600 hover:underline">{user.name}</Link> <span className="text-slate-400">{idBadge(user.id)}</span></p>
  </div>
  </div>
 

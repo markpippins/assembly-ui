@@ -6,6 +6,7 @@ import { StatusBadge } from '../components/StatusBadge';
 import { dataService } from '../services/dataService';
 import { useLiveData } from '../context/LiveDataContext';
 import { formatDateTime } from '../utils/format';
+import { idBadge } from '../utils/idFormat';
 import { Agenda } from '../types';
 
 export const AgendasView: React.FC = () => {
@@ -33,7 +34,7 @@ export const AgendasView: React.FC = () => {
  <div className="space-y-2">
  <div className="flex items-center justify-between">
  <StatusBadge status={agenda.status} />
- <Link to={`/agendas/${agenda.id}`} className="font-mono text-[10px] text-indigo-600 hover:underline">{agenda.id}</Link>
+ <Link to={`/agendas/${agenda.id}`} className="font-mono text-[10px] text-indigo-600 hover:underline">{idBadge(agenda.id)}</Link>
  </div>
  <h2 className="text-base font-bold text-slate-900 font-poppins">{agenda.title}</h2>
  <p className="text-sm text-slate-700 font-medium">Scope: {agenda.scope || 'General'}</p>

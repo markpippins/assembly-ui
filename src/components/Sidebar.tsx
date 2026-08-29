@@ -6,6 +6,7 @@ import {
   Calendar, CheckCircle2, Settings, Search as SearchIcon, Clock, FileText
 } from 'lucide-react';
 import { dataService } from '../services/dataService';
+import { shortId } from '../utils/idFormat';
 import { Counts } from '../types';
 import { useRecentlyViewed } from '../context/RecentlyViewedContext';
 
@@ -143,7 +144,7 @@ export const Sidebar: React.FC = () => {
                 >
                   <div className="flex items-center gap-2 truncate">
                     <FileText className="w-3.5 h-3.5 shrink-opacity-60 group-hover:opacity-100" />
-                    <span className="truncate">{item.title}</span>
+                    <span className="truncate">{item.title || shortId(item.id)}</span>
                   </div>
                 </NavLink>
               ))}

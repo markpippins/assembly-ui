@@ -7,6 +7,7 @@ import { CandidateGatePanel } from '../components/CandidateGatePanel'; // [candi
 import { dataService } from '../services/dataService';
 import { useLiveData } from '../context/LiveDataContext';
 import { formatDateTime } from '../utils/format';
+import { idBadge, entityLabel } from '../utils/idFormat';
 import * as api from '../services/apiClient';
 
 // ── Entity route map (mirrors Angular utils/entity-route) ─────────────
@@ -418,7 +419,7 @@ export const EntityDetailView: React.FC = () => {
  <span>Back</span>
  </button>
  <span>/</span>
- <Link to={location.pathname} className="text-slate-900 font-mono hover:text-indigo-600 :text-indigo-400 hover:underline">{id}</Link>
+ <Link to={location.pathname} className="text-slate-900 font-mono hover:text-indigo-600 :text-indigo-400 hover:underline">{idBadge(id)}</Link>
  </div>
 
   <PageHeader
@@ -534,7 +535,7 @@ export const EntityDetailView: React.FC = () => {
  <Database className="w-4 h-4 text-slate-500 " />
  Metadata
  </h2>
- <Link to={location.pathname} className="font-mono text-[11px] text-indigo-600 hover:underline">ID: {entityData.id}</Link>
+ <Link to={location.pathname} className="font-mono text-[11px] text-indigo-600 hover:underline">ID: {idBadge(entityData.id)}</Link>
  </div>
  <dl className="divide-y divide-slate-100 ">
  {metadataEntries.map((entry) => (
@@ -543,7 +544,7 @@ export const EntityDetailView: React.FC = () => {
  <dd className="text-sm text-slate-900 sm:col-span-2 whitespace-pre-wrap break-words">
  {entry.route ? (
  <Link to={entry.route} className="inline-flex items-center gap-1.5 text-indigo-600 hover:underline font-semibold">
- {entry.formattedValue}
+ {entityLabel(String(entry.value), entry.rawKey)}
  <CheckCircle2 className="w-3.5 h-3.5 opacity-70 flex-shrink-0" />
  </Link>
  ) : (
@@ -572,7 +573,7 @@ export const EntityDetailView: React.FC = () => {
  <div className="text-xs text-slate-500 mt-1 line-clamp-2">{set.description}</div>
  )}
  <div className="text-[10px] font-mono text-slate-400 mt-1">
- ID: {set.id.slice(0, 8)}…
+ {idBadge(set.id)}
  </div>
  </div>
  ))}

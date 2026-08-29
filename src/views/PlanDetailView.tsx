@@ -7,6 +7,7 @@ import { MarkdownRenderer } from '../components/MarkdownRenderer';
 import { dataService } from '../services/dataService';
 import { useLiveData } from '../context/LiveDataContext';
 import { formatDateTime } from '../utils/format';
+import { idBadge } from '../utils/idFormat';
 import { Plan } from '../types';
 
 export const PlanDetailView: React.FC = () => {
@@ -40,7 +41,7 @@ export const PlanDetailView: React.FC = () => {
  <span>Plans</span>
  </Link>
  <span>/</span>
- <Link to={`/plans/${plan.id}`} className="text-slate-900 font-mono hover:text-indigo-600 :text-indigo-400 hover:underline">{plan.id}</Link>
+ <Link to={`/plans/${plan.id}`} className="text-slate-900 font-mono hover:text-indigo-600 :text-indigo-400 hover:underline">{idBadge(plan.id)}</Link>
  </div>
 
  <PageHeader

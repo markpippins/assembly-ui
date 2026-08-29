@@ -5,6 +5,7 @@ import { PageHeader } from '../components/PageHeader';
 import { dataService } from '../services/dataService';
 import { useLiveData } from '../context/LiveDataContext';
 import { formatDateTime } from '../utils/format';
+import { idBadge, entityLabel } from '../utils/idFormat';
 import { Specification } from '../types';
 
 export const SpecificationsView: React.FC = () => {
@@ -32,10 +33,10 @@ export const SpecificationsView: React.FC = () => {
  Revision #{spec.revisionNumber} ({spec.revisionType})
  </span>
  </div>
- <Link to={`/specifications/${spec.id}`} className="font-mono text-[11px] text-indigo-600 hover:underline">{spec.id}</Link>
+ <Link to={`/specifications/${spec.id}`} className="font-mono text-[11px] text-indigo-600 hover:underline">{idBadge(spec.id)}</Link>
  </div>
 
- <h2 className="text-base font-bold text-slate-900 font-poppins">Specification for Agenda: {spec.agendaId}</h2>
+ <h2 className="text-base font-bold text-slate-900 font-poppins">Specification for Agenda: <Link to={`/agendas/${spec.agendaId}`} className="text-indigo-600 hover:underline">{entityLabel(spec.agendaId, 'agenda')}</Link></h2>
  <p className="text-sm text-slate-700 ">{spec.changeSummary}</p>
 
  <div className="pt-3 border-t border-slate-200 flex items-center justify-between text-sm font-mono text-slate-500 ">

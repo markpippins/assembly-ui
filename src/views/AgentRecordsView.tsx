@@ -7,6 +7,7 @@ import { TTSButton } from '../components/TTSButton';
 import { dataService } from '../services/dataService';
 import { useLiveData } from '../context/LiveDataContext';
 import { formatDateTime } from '../utils/format';
+import { idBadge } from '../utils/idFormat';
 import { AgentRecord } from '../types';
 
 export const AgentRecordsView: React.FC = () => {
@@ -39,7 +40,7 @@ export const AgentRecordsView: React.FC = () => {
  </div>
  <div className="flex items-center gap-2">
  <TTSButton text={`${rec.title || ''}. ${rec.content || ''}`} label="Read Record" />
- <Link to={`/agent-records/${rec.id}`} className="font-mono text-[11px] text-indigo-600 hover:underline">{rec.id}</Link>
+ <Link to={`/agent-records/${rec.id}`} className="font-mono text-[11px] text-indigo-600 hover:underline">{idBadge(rec.id)}</Link>
  </div>
  </div>
 

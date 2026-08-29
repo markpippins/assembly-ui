@@ -5,6 +5,7 @@ import { PageHeader } from '../components/PageHeader';
 import { dataService } from '../services/dataService';
 import { useLiveData } from '../context/LiveDataContext';
 import { formatDateTime } from '../utils/format';
+import { idBadge, entityLabel } from '../utils/idFormat';
 import { Observation } from '../types';
 
 /** Compact single-line payload summary (mirrors Angular payloadSummary). */
@@ -49,7 +50,7 @@ export const ObservationsView: React.FC = () => {
  </span>
  )}
  </div>
- <Link to={`/observations/${obs.id}`} className="font-mono text-[11px] text-indigo-600 hover:underline">{obs.id}</Link>
+ <Link to={`/observations/${obs.id}`} className="font-mono text-[11px] text-indigo-600 hover:underline">{idBadge(obs.id)}</Link>
  </div>
 
  <p className="bg-slate-50 px-3 py-2 rounded-lg font-mono text-xs text-slate-600 overflow-x-auto border border-slate-200 whitespace-pre-wrap break-words">
@@ -58,7 +59,7 @@ export const ObservationsView: React.FC = () => {
 
  <div className="pt-2 flex justify-between items-center text-sm font-mono text-slate-500 ">
  <span>
- <span className="mr-3">Artifact: {obs.sourceArtifactId || 'N/A'}</span>
+ <span className="mr-3">Artifact: {obs.sourceArtifactId ? <Link to={`/assessments/${obs.sourceArtifactId}`} className="text-indigo-600 hover:underline">{entityLabel(obs.sourceArtifactId, obs.sourceArtifactType || undefined)}</Link> : 'N/A'}</span>
  <span className="mr-3">Type: {obs.sourceArtifactType || '—'}</span>
  <span>{formatDateTime(obs.createdAt)}</span>
  </span>

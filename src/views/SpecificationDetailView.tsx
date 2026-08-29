@@ -5,6 +5,7 @@ import { PageHeader } from '../components/PageHeader';
 import { dataService } from '../services/dataService';
 import { useLiveData } from '../context/LiveDataContext';
 import { formatDateTime } from '../utils/format';
+import { idBadge, entityLabel } from '../utils/idFormat';
 import { Specification } from '../types';
 
 export const SpecificationDetailView: React.FC = () => {
@@ -38,11 +39,11 @@ export const SpecificationDetailView: React.FC = () => {
  <span>Specifications</span>
  </Link>
  <span>/</span>
- <Link to={`/specifications/${spec.id}`} className="text-slate-900 font-mono hover:text-indigo-600 :text-indigo-400 hover:underline">{spec.id}</Link>
+ <Link to={`/specifications/${spec.id}`} className="text-slate-900 font-mono hover:text-indigo-600 :text-indigo-400 hover:underline">{idBadge(spec.id)}</Link>
  </div>
 
  <PageHeader
- title={<>Specification <Link to={`/specifications/${spec.id}`} className="text-indigo-600 hover:underline font-mono">{spec.id}</Link></>}
+ title={<>Specification <Link to={`/specifications/${spec.id}`} className="text-indigo-600 hover:underline font-mono">{idBadge(spec.id)}</Link></>}
  subtitle={`Revision ${spec.revisionNumber} (${spec.revisionType})`}
  ttsContent={`Specification ${spec.id}. ${spec.changeSummary || ''}`}
  />
@@ -71,7 +72,7 @@ export const SpecificationDetailView: React.FC = () => {
  <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider font-mono mb-2">Derived From</h3>
  <ul className="space-y-1">
  {spec.derivedFrom.map((source) => (
- <li key={source} className="text-sm font-mono text-slate-600 ">{source}</li>
+ <li key={source} className="text-sm font-mono text-slate-600 "><Link to={`/specifications/${source}`} className="text-indigo-600 hover:underline">{entityLabel(source, 'specification')}</Link></li>
  ))}
  </ul>
  </div>
