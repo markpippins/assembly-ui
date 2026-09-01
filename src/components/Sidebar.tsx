@@ -3,7 +3,7 @@ import { NavLink } from 'react-router-dom';
 import {
   Rss, MessageSquare, HelpCircle, CheckSquare, ListOrdered,
   FileCheck, Shield, Users, Sprout, Eye, BarChart3, Bot, FileCode,
-  Calendar, CheckCircle2, Settings, Search as SearchIcon, Clock, FileText
+  Calendar, CheckCircle2, Settings, Search as SearchIcon, Clock, FileText, ShieldAlert
 } from 'lucide-react';
 import { dataService } from '../services/dataService';
 import { shortId } from '../utils/idFormat';
@@ -65,6 +65,11 @@ export const Sidebar: React.FC = () => {
       items: [
         { label: 'Questions', path: '/open-questions', icon: HelpCircle, badge: counts.openQuestions },
         { label: 'Answers', path: '/resolutions', icon: CheckCircle2 },
+      ],
+    },
+    {
+      items: [
+        { label: 'Sonar', path: '/sonar', icon: ShieldAlert },
       ],
     },
     {

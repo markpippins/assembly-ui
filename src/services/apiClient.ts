@@ -490,3 +490,96 @@ export function fetchCandidatesIndex(force = false): Promise<Record<string, any>
   })();
   return candIndexPromise;
 }
+
+// ── Sonar folder ────────────────────────────────────────────────────
+// Canonical `sonar` schema reads via the ballerina sonar-sync moat
+// (:9096, proxied by vite as /sonar-sync). Issues/hotspots are mirrored
+// from SonarQube by the sync loop; review writeback is agent-side.
+export interface SonarIssueRow {
+  key: string;
+  sonar_type?: string | null;
+  severity?: string | null;
+  status?: string | null;
+  resolution?: string | null;
+  component_key?: string | null;
+  line?: number | null;
+  rule_key?: string | null;
+  message?: string | null;
+  review_status?: string | null;
+  review_owner?: string | null;
+  first_seen_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface SonarHotspotRow {
+  key: string;
+  security_category?: string | null;
+  vulnerability_probability?: string | null;
+  status?: string | null;
+  resolution?: string | null;
+  component_key?: string | null;
+  line?: number | null;
+  rule_key?: string | null;
+  message?: string | null;
+  review_status?: string | null;
+  review_owner?: string | null;
+  first_seen_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface SonarListEnvelope<T> {
+  items: T[];
+  count: number;
+}
+
+const SONAR_SYNC_BASE = '/sonar-sync';
+
+export async function sonarSyncGet<T>(
+  path: string,
+  params?: Record<string, string | number | undefined>,
+): Promise<T> {
+  const url = listUrl(path, params as Record<string, string>, SONAR_SYNC_BASE);
+  return request<T>(url);
+}
+
+// Review writeback — POSTs through the /sonar-sync proxy (vite → sonar-sync
+// :9096). Server-side it updates SonarQube AND the local review_status.
+export async function sonarSyncPost<T>(
+  path: string,
+  params?: Record<string, string | number | undefined>,
+): Promise<T> {
+  const url = listUrl(path, params as Record<string, string>, SONAR_SYNC_BASE);
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`sonar-sync writeback ${res.status}: ${text.slice(0, 200)}`);
+  }
+  return res.json() as Promise<T>;
+}
+
+export function getSonarIssues(params?: Record<string, string | number | undefined>) {
+  return sonarSyncGet<SonarListEnvelope<SonarIssueRow>>('/issues', params);
+}
+
+export function getSonarHotspots(params?: Record<string, string | number | undefined>) {
+  return sonarSyncGet<SonarListEnvelope<SonarHotspotRow>>('/hotspots', params);
+}
+
+export function reviewSonarHotspot(key: string, action: 'safe' | 'fixed' | 'accept-risk') {
+  return sonarSyncPost<{ ok: boolean; key: string }>('/hotspotReview', {
+    hotspotKey: key,
+    action,
+    owner: 'ui',
+  });
+}
+
+export function reviewSonarIssue(key: string, transition: 'resolve' | 'wontfix' | 'falsepositive') {
+  return sonarSyncPost<{ ok: boolean; key: string }>('/issueReview', {
+    issueKey: key,
+    transition,
+    owner: 'ui',
+  });
+}
