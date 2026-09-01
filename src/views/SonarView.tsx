@@ -9,7 +9,15 @@ import {
   ArrowUpDown,
 } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
-import { getSonarIssues, getSonarHotspots, SonarListEnvelope, SonarIssueRow, SonarHotspotRow } from '../services/apiClient';
+import {
+  getSonarIssues,
+  getSonarHotspots,
+  reviewSonarHotspot,
+  reviewSonarIssue,
+  SonarListEnvelope,
+  SonarIssueRow,
+  SonarHotspotRow,
+} from '../services/apiClient';
 
 const severityStyles: Record<string, string> = {
   BLOCKER: 'bg-rose-100 text-rose-700 ring-rose-200',
@@ -50,6 +58,37 @@ function ReviewBadge({ value }: { value?: string | null }) {
 
 function truncate(s: string, n: number) {
   return s.length > n ? s.slice(0, n) + '…' : s;
+}
+
+function WriteButtons({
+  busy,
+  actions,
+  onAction,
+}: {
+  busy: boolean;
+  actions: { label: string; value: string; cls: string }[];
+  onAction: (v: string) => void;
+}) {
+  if (busy) return <span className="inline-block mt-1 text-[10px] text-slate-400 animate-pulse">saving…</span>;
+  return (
+    <span className="flex flex-wrap gap-1 mt-1">
+      {actions.map((a) => (
+        <button
+          key={a.value}
+          onClick={(e) => { e.stopPropagation(); onAction(a.value); }}
+          title="Write review decision back to SonarQube + local schema"
+          className={`rounded border px-1.5 py-0.5 text-[9px] font-semibold transition-colors ${a.cls}`}
+        >
+          {a.label}
+        </button>
+      ))}
+    </span>
+  );
+}
+
+function WriteError({ message }: { message: string | null }) {
+  if (!message) return null;
+  return <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">{message}</div>;
 }
 
 const selectCls =
@@ -175,6 +214,9 @@ function IssuesTab() {
   const [sortKey, setSortKey] = useState('severity');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState<Record<string, boolean>>({});
+  const [writeError, setWriteError] = useState<string | null>(null);
+  const [revision, setRevision] = useState(0);
 
   useEffect(() => {
     let isMounted = true;
@@ -202,7 +244,21 @@ function IssuesTab() {
         if (isMounted) setIsLoading(false);
       });
     return () => { isMounted = false; };
-  }, [severity, issueType, status, query, page]);
+  }, [severity, issueType, status, query, page, revision]);
+
+  const applyReview = async (key: string, transition: string) => {
+    setBusy((p) => ({ ...p, [key]: true }));
+    setWriteError(null);
+    try {
+      await reviewSonarIssue(key, transition as 'resolve' | 'wontfix' | 'falsepositive');
+      setRevision((r) => r + 1);
+    } catch (err: any) {
+      console.error('issue writeback failed:', err);
+      setWriteError(err?.message ?? 'Writeback failed — sonar-sync unreachable?');
+    } finally {
+      setBusy((p) => { const n = { ...p }; delete n[key]; return n; });
+    }
+  };
 
   const ordered = useMemo(() => {
     const copy = [...envelope.items];
@@ -266,6 +322,7 @@ function IssuesTab() {
         </div>
         <div className="ml-auto"><SortSelect value={sortKey} onChange={setSortKey} options={[['severity', 'Severity'], ['updated', 'Updated'], ['component', 'Component']]} /></div>
       </FilterBar>
+      <WriteError message={writeError} />
 
       <div className="app-panel overflow-hidden">
         <div className="overflow-x-auto">
@@ -301,7 +358,20 @@ function IssuesTab() {
                     </td>
                     <td className="py-3 px-4 font-mono text-[11px] text-slate-500">{truncate(it.component_key ?? '', 42)}</td>
                     <td className="py-3 px-4 font-mono text-xs text-slate-500">{it.line ?? ''}</td>
-                    <td className="py-3 px-4"><ReviewBadge value={it.review_status} /></td>
+                    <td className="py-3 px-4">
+                      <ReviewBadge value={it.review_status} />
+                      {!it.review_status && (
+                        <WriteButtons
+                          busy={!!busy[it.key]}
+                          onAction={(v) => applyReview(it.key, v)}
+                          actions={[
+                            { label: 'Resolve', value: 'resolve', cls: 'border-emerald-200 text-emerald-700 hover:bg-emerald-50' },
+                            { label: "Won't fix", value: 'wontfix', cls: 'border-amber-200 text-amber-700 hover:bg-amber-50' },
+                            { label: 'False pos', value: 'falsepositive', cls: 'border-sky-200 text-sky-700 hover:bg-sky-50' },
+                          ]}
+                        />
+                      )}
+                    </td>
                     <td className="py-3 px-4 text-xs text-slate-500">{it.updated_at ? new Date(it.updated_at).toLocaleDateString() : ''}</td>
                   </tr>
                 ))}
@@ -325,6 +395,9 @@ function HotspotsTab() {
   const [sortKey, setSortKey] = useState('probability');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState<Record<string, boolean>>({});
+  const [writeError, setWriteError] = useState<string | null>(null);
+  const [revision, setRevision] = useState(0);
 
   const categories = useMemo(() => {
     const seen = new Set<string>();
@@ -356,7 +429,21 @@ function HotspotsTab() {
         if (isMounted) setIsLoading(false);
       });
     return () => { isMounted = false; };
-  }, [category, status, query, page]);
+  }, [category, status, query, page, revision]);
+
+  const applyReview = async (key: string, action: string) => {
+    setBusy((p) => ({ ...p, [key]: true }));
+    setWriteError(null);
+    try {
+      await reviewSonarHotspot(key, action as 'safe' | 'fixed' | 'accept-risk');
+      setRevision((r) => r + 1);
+    } catch (err: any) {
+      console.error('hotspot writeback failed:', err);
+      setWriteError(err?.message ?? 'Writeback failed — sonar-sync unreachable?');
+    } finally {
+      setBusy((p) => { const n = { ...p }; delete n[key]; return n; });
+    }
+  };
 
   const ordered = useMemo(() => {
     const copy = [...envelope.items];
@@ -406,6 +493,7 @@ function HotspotsTab() {
         </div>
         <div className="ml-auto"><SortSelect value={sortKey} onChange={setSortKey} options={[['probability', 'Probability'], ['updated', 'Updated'], ['component', 'Component']]} /></div>
       </FilterBar>
+      <WriteError message={writeError} />
 
       <div className="app-panel overflow-hidden">
         <div className="overflow-x-auto">
@@ -441,7 +529,20 @@ function HotspotsTab() {
                     </td>
                     <td className="py-3 px-4 font-mono text-[11px] text-slate-500">{truncate(h.component_key ?? '', 42)}</td>
                     <td className="py-3 px-4 font-mono text-xs text-slate-500">{h.line ?? ''}</td>
-                    <td className="py-3 px-4"><ReviewBadge value={h.review_status} /></td>
+                    <td className="py-3 px-4">
+                      <ReviewBadge value={h.review_status} />
+                      {!h.review_status && h.status === 'TO_REVIEW' && (
+                        <WriteButtons
+                          busy={!!busy[h.key]}
+                          onAction={(v) => applyReview(h.key, v)}
+                          actions={[
+                            { label: 'Safe', value: 'safe', cls: 'border-emerald-200 text-emerald-700 hover:bg-emerald-50' },
+                            { label: 'Fixed', value: 'fixed', cls: 'border-sky-200 text-sky-700 hover:bg-sky-50' },
+                            { label: 'Accept risk', value: 'accept-risk', cls: 'border-amber-200 text-amber-700 hover:bg-amber-50' },
+                          ]}
+                        />
+                      )}
+                    </td>
                     <td className="py-3 px-4 text-xs text-slate-500">{h.updated_at ? new Date(h.updated_at).toLocaleDateString() : ''}</td>
                   </tr>
                 ))}

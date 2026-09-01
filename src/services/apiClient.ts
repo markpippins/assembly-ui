@@ -542,10 +542,44 @@ export async function sonarSyncGet<T>(
   return request<T>(url);
 }
 
+// Review writeback — POSTs through the /sonar-sync proxy (vite → sonar-sync
+// :9096). Server-side it updates SonarQube AND the local review_status.
+export async function sonarSyncPost<T>(
+  path: string,
+  params?: Record<string, string | number | undefined>,
+): Promise<T> {
+  const url = listUrl(path, params as Record<string, string>, SONAR_SYNC_BASE);
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`sonar-sync writeback ${res.status}: ${text.slice(0, 200)}`);
+  }
+  return res.json() as Promise<T>;
+}
+
 export function getSonarIssues(params?: Record<string, string | number | undefined>) {
   return sonarSyncGet<SonarListEnvelope<SonarIssueRow>>('/issues', params);
 }
 
 export function getSonarHotspots(params?: Record<string, string | number | undefined>) {
   return sonarSyncGet<SonarListEnvelope<SonarHotspotRow>>('/hotspots', params);
+}
+
+export function reviewSonarHotspot(key: string, action: 'safe' | 'fixed' | 'accept-risk') {
+  return sonarSyncPost<{ ok: boolean; key: string }>('/hotspotReview', {
+    hotspotKey: key,
+    action,
+    owner: 'ui',
+  });
+}
+
+export function reviewSonarIssue(key: string, transition: 'resolve' | 'wontfix' | 'falsepositive') {
+  return sonarSyncPost<{ ok: boolean; key: string }>('/issueReview', {
+    issueKey: key,
+    transition,
+    owner: 'ui',
+  });
 }
