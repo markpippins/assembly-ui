@@ -37,6 +37,9 @@ export default defineConfig(({ mode }) => {
           secure: false,
           rewrite: (p: string) => p.replace(/^\/nebula/, "/api"),
         },
+        // Sonar folder — canonical `sonar` schema reads via the ballerina
+        // sonar-sync moat (issues/hotspots mirrored from SonarQube).
+        "/sonar-sync": { target: "http://localhost:9096", changeOrigin: true, secure: false },
       },
     },
     build: {

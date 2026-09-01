@@ -51,6 +51,7 @@ const SpecsView = lazy(() => import('./views/SpecsView').then(m => ({ default: m
 const EntityDetailView = lazy(() => import('./views/EntityDetailView').then(m => ({ default: m.EntityDetailView })));
 const ProfileView = lazy(() => import('./views/ProfileView').then(m => ({ default: m.ProfileView })));
 const SettingsView = lazy(() => import('./views/SettingsView').then(m => ({ default: m.SettingsView })));
+const SonarView = lazy(() => import('./views/SonarView').then(m => ({ default: m.SonarView })));
 const SearchView = lazy(() => import('./views/SearchView').then(m => ({ default: m.SearchView })));
 
 // ── Route-level Suspense fallback ───────────────────────────────────
@@ -107,6 +108,7 @@ function AnimatedRoutes() {
 
  {/* Harvests */}
  <Route path="/harvests" element={<HarvestsView />} />
+ <Route path="/sonar" element={<SonarView />} />
  <Route path="/harvests/:id" element={<HarvestDetailView />} />
 
  {/* Open Questions */}
