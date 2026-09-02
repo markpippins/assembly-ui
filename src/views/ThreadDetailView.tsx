@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Send, CornerDownRight, CheckCircle2, Pencil, Trash2 } from 'lucide-react';
+import { Send, CornerDownRight, CheckCircle2, Pencil, Trash2, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { Avatar } from '../components/Avatar';
 import { TTSButton } from '../components/TTSButton';
 import { InteractiveMarkdown, buildSelectionBody, splitSegments, isOtherItem } from '../components/InteractiveMarkdown';
@@ -12,6 +12,7 @@ import { StatusIndicator } from '../components/StatusIndicator';
 import { formatDateTime } from '../utils/format';
 import { useToast } from '../context/ToastContext';
 import { Thread, Comment, THREAD_STATUS_LIST, statusMeta } from '../types';
+import { titleTag, sonarKeyOf } from '../utils/threadTags';
 
 export const ThreadDetailView: React.FC = () => {
  const { version } = useLiveData();
@@ -41,6 +42,51 @@ export const ThreadDetailView: React.FC = () => {
   // like a promotion batch; drives link decoration + status badges.
   const [candIndex, setCandIndex] = useState<Record<string, any>>({});
   const { showToast } = useToast();
+
+  // ── Sonar finding writeback (SQ threads) ──────────────────────────
+  // If this thread is a sonar-sync finding (`[SQ …]` title + `Sonar key:`
+  // marker) and is still open, offer review buttons that write the decision
+  // back through sonar-sync, then close the thread (comment + status 4) so
+  // the forum reflects it immediately. The sonar-forum-sync scheduled run
+  // then finds the thread already closed (idempotent).
+  const sonarInfo = useMemo(() => {
+    if (!thread) return null;
+    const tg = titleTag(thread.title);
+    if (!tg || !tg.tag.startsWith('SQ ')) return null;
+    const key = sonarKeyOf(thread.body || '');
+    if (!key) return null;
+    const isHotspot = tg.tag.includes('HOTSPOT');
+    const closed = (thread.statusRating ?? 0) >= 4;
+    return { key, isHotspot, closed };
+  }, [thread]);
+  const [sonarBusy, setSonarBusy] = useState<string | null>(null);
+  const [sonarError, setSonarError] = useState<string | null>(null);
+
+  const applySonarReview = async (action: string) => {
+    if (!sonarInfo || !thread) return;
+    setSonarBusy(action);
+    setSonarError(null);
+    try {
+      if (sonarInfo.isHotspot) {
+        await api.reviewSonarHotspot(sonarInfo.key, action as 'safe' | 'fixed' | 'accept-risk');
+      } else {
+        await api.reviewSonarIssue(sonarInfo.key, action as 'resolve' | 'wontfix' | 'falsepositive');
+      }
+      // Persist onto the thread: completion comment + status 4, so the
+      // forum closes immediately (sonar-forum-sync keeps it that way).
+      dataService.addComment(thread.id, {
+        body: `Resolved via assembly writeback (**${action}**) — SonarQube + the \`sonar\` schema are updated.`,
+      });
+      dataService.setThreadStatus(thread.id, 4);
+      setThread({ ...thread, statusRating: 4 });
+      showToast('Review written back to SonarQube; thread closed', 'success');
+    } catch (e: any) {
+      console.error('sonar writeback failed:', e);
+      setSonarError(e?.message ?? 'Writeback failed — sonar-sync unreachable?');
+    } finally {
+      setSonarBusy(null);
+    }
+  };
 
  const loadData = () => {
  console.log('[tdv] loadData start ' + JSON.stringify({ slug, threadId }));
@@ -521,6 +567,61 @@ export const ThreadDetailView: React.FC = () => {
  <span className="ml-1">{formatDateTime(thread.createdAt)}</span>
  </div>
  </div>
+
+ {/* Sonar finding writeback panel (SQ threads only, while open) */}
+ {sonarInfo && !sonarInfo.closed && (
+ <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
+ <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
+ <ShieldCheck className="w-3.5 h-3.5 text-indigo-500" />
+ Review this finding (writes back to SonarQube + the `sonar` schema, closes the thread)
+ </div>
+ {sonarError && (
+ <div className="mt-2 flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+ <ShieldAlert className="w-3.5 h-3.5 flex-shrink-0" /> {sonarError}
+ </div>
+ )}
+ <div className="mt-2 flex flex-wrap gap-2">
+ {sonarInfo.isHotspot ? (
+ <>
+ <button
+ onClick={() => applySonarReview('safe')}
+ disabled={!!sonarBusy}
+ className="rounded-lg border border-emerald-300 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
+ >{sonarBusy === 'safe' ? 'saving…' : 'Safe'}</button>
+ <button
+ onClick={() => applySonarReview('fixed')}
+ disabled={!!sonarBusy}
+ className="rounded-lg border border-sky-300 px-3 py-1.5 text-xs font-semibold text-sky-700 hover:bg-sky-50 disabled:opacity-50"
+ >{sonarBusy === 'fixed' ? 'saving…' : 'Fixed'}</button>
+ <button
+ onClick={() => applySonarReview('accept-risk')}
+ disabled={!!sonarBusy}
+ className="rounded-lg border border-amber-300 px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-50 disabled:opacity-50"
+ >{sonarBusy === 'accept-risk' ? 'saving…' : 'Accept risk'}</button>
+ </>
+ ) : (
+ <>
+ <button
+ onClick={() => applySonarReview('resolve')}
+ disabled={!!sonarBusy}
+ className="rounded-lg border border-emerald-300 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
+ >{sonarBusy === 'resolve' ? 'saving…' : 'Resolve'}</button>
+ <button
+ onClick={() => applySonarReview('wontfix')}
+ disabled={!!sonarBusy}
+ className="rounded-lg border border-amber-300 px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-50 disabled:opacity-50"
+ >{sonarBusy === 'wontfix' ? 'saving…' : "Won't fix"}</button>
+ <button
+ onClick={() => applySonarReview('falsepositive')}
+ disabled={!!sonarBusy}
+ className="rounded-lg border border-sky-300 px-3 py-1.5 text-xs font-semibold text-sky-700 hover:bg-sky-50 disabled:opacity-50"
+ >{sonarBusy === 'falsepositive' ? 'saving…' : 'False positive'}</button>
+ </>
+ )}
+ </div>
+ </div>
+ )}
+
   <div className="mt-4">
   {/* [candidate-drilldown] decoratedThreadBody adds per-candidate links +
       status badges; selection/verdict machinery below keeps using the raw

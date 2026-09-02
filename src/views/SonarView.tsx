@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import {
   ShieldAlert,
   Bug,
@@ -7,6 +8,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ArrowUpDown,
+  ExternalLink,
 } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
 import {
@@ -14,10 +16,33 @@ import {
   getSonarHotspots,
   reviewSonarHotspot,
   reviewSonarIssue,
+  fetchThreads,
   SonarListEnvelope,
   SonarIssueRow,
   SonarHotspotRow,
 } from '../services/apiClient';
+import { sonarKeyOf, ruleFamilyOf } from '../utils/threadTags';
+
+// Sonar finding key / rule family -> sonar forum thread id (from the
+// `Sonar key:` / `Rule family:` body markers the sync script writes).
+interface SonarThreadMap {
+  finding: Record<string, string>;
+  rule: Record<string, string>;
+}
+const EMPTY_THREAD_MAP: SonarThreadMap = { finding: {}, rule: {} };
+
+function ForumLink({ tid }: { tid?: string }) {
+  if (!tid) return <span className="text-xs text-slate-300">—</span>;
+  return (
+    <Link
+      to={`/forums/sonar/${tid}`}
+      className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600 hover:text-indigo-500 transition-colors"
+      title="Open the sonar forum thread for this finding"
+    >
+      <ExternalLink className="w-3 h-3" /> Forum
+    </Link>
+  );
+}
 
 const severityStyles: Record<string, string> = {
   BLOCKER: 'bg-rose-100 text-rose-700 ring-rose-200',
@@ -169,6 +194,29 @@ type Tab = 'issues' | 'hotspots';
 export const SonarView: React.FC = () => {
   const [tab, setTab] = useState<Tab>('issues');
 
+  // sonar forum thread map — fetched once, shared by both tabs. Rows link to
+  // their per-finding thread (BLOCKER/CRITICAL/hotspots) or, for grouped
+  // MAJOR+ findings, to the rule-family thread.
+  const [threadMap, setThreadMap] = useState<SonarThreadMap>(EMPTY_THREAD_MAP);
+  useEffect(() => {
+    let isMounted = true;
+    fetchThreads('sonar', { includeBody: true })
+      .then((threads) => {
+        if (!isMounted) return;
+        const finding: Record<string, string> = {};
+        const rule: Record<string, string> = {};
+        for (const t of threads) {
+          const fk = sonarKeyOf(t.body || '');
+          if (fk) finding[fk] = t.id;
+          const rk = ruleFamilyOf(t.body || '');
+          if (rk) rule[rk] = t.id;
+        }
+        setThreadMap({ finding, rule });
+      })
+      .catch((err) => console.error('sonar thread map fetch failed:', err));
+    return () => { isMounted = false; };
+  }, []);
+
   return (
     <div className="max-w-7xl mx-auto py-6 px-4 space-y-6">
       <PageHeader
@@ -196,7 +244,7 @@ export const SonarView: React.FC = () => {
         </div>
       </PageHeader>
 
-      {tab === 'issues' ? <IssuesTab /> : <HotspotsTab />}
+      {tab === 'issues' ? <IssuesTab threadMap={threadMap} /> : <HotspotsTab threadMap={threadMap} />}
     </div>
   );
 };
@@ -204,7 +252,7 @@ export const SonarView: React.FC = () => {
 /* ── Issues tab ─────────────────────────────────────────────────── */
 const PAGE_SIZE = 25;
 
-function IssuesTab() {
+function IssuesTab({ threadMap }: { threadMap: SonarThreadMap }) {
   const [envelope, setEnvelope] = useState<SonarListEnvelope<SonarIssueRow>>({ items: [], count: 0 });
   const [page, setPage] = useState(1);
   const [severity, setSeverity] = useState('');
@@ -337,14 +385,15 @@ function IssuesTab() {
                 <th className="py-3 px-4 font-semibold">Line</th>
                 <th className="py-3 px-4 font-semibold">Review</th>
                 <th className="py-3 px-4 font-semibold">Updated</th>
+                <th className="py-3 px-4 font-semibold">Forum</th>
               </tr>
             </thead>
             {error ? (
-              <tbody><tr><td colSpan={8} className="py-8 px-4 text-center text-sm text-rose-600">{error}</td></tr></tbody>
+              <tbody><tr><td colSpan={9} className="py-8 px-4 text-center text-sm text-rose-600">{error}</td></tr></tbody>
             ) : isLoading ? (
-              <tbody><tr><td colSpan={8} className="py-8 px-4 text-center text-sm text-slate-500">Loading…</td></tr></tbody>
+              <tbody><tr><td colSpan={9} className="py-8 px-4 text-center text-sm text-slate-500">Loading…</td></tr></tbody>
             ) : ordered.length === 0 ? (
-              <tbody><tr><td colSpan={8} className="py-8 px-4 text-center text-sm text-slate-500">No issues match the current filters.</td></tr></tbody>
+              <tbody><tr><td colSpan={9} className="py-8 px-4 text-center text-sm text-slate-500">No issues match the current filters.</td></tr></tbody>
             ) : (
               <tbody className="divide-y divide-slate-100">
                 {ordered.map((it) => (
@@ -373,6 +422,9 @@ function IssuesTab() {
                       )}
                     </td>
                     <td className="py-3 px-4 text-xs text-slate-500">{it.updated_at ? new Date(it.updated_at).toLocaleDateString() : ''}</td>
+                    <td className="py-3 px-4">
+                      <ForumLink tid={threadMap.finding[it.key] ?? (it.rule_key ? threadMap.rule[it.rule_key] : undefined)} />
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -386,7 +438,7 @@ function IssuesTab() {
 }
 
 /* ── Security Hotspots tab ──────────────────────────────────────── */
-function HotspotsTab() {
+function HotspotsTab({ threadMap }: { threadMap: SonarThreadMap }) {
   const [envelope, setEnvelope] = useState<SonarListEnvelope<SonarHotspotRow>>({ items: [], count: 0 });
   const [page, setPage] = useState(1);
   const [category, setCategory] = useState('');
@@ -508,14 +560,15 @@ function HotspotsTab() {
                 <th className="py-3 px-4 font-semibold">Line</th>
                 <th className="py-3 px-4 font-semibold">Review</th>
                 <th className="py-3 px-4 font-semibold">Updated</th>
+                <th className="py-3 px-4 font-semibold">Forum</th>
               </tr>
             </thead>
             {error ? (
-              <tbody><tr><td colSpan={8} className="py-8 px-4 text-center text-sm text-rose-600">{error}</td></tr></tbody>
+              <tbody><tr><td colSpan={9} className="py-8 px-4 text-center text-sm text-rose-600">{error}</td></tr></tbody>
             ) : isLoading ? (
-              <tbody><tr><td colSpan={8} className="py-8 px-4 text-center text-sm text-slate-500">Loading…</td></tr></tbody>
+              <tbody><tr><td colSpan={9} className="py-8 px-4 text-center text-sm text-slate-500">Loading…</td></tr></tbody>
             ) : ordered.length === 0 ? (
-              <tbody><tr><td colSpan={8} className="py-8 px-4 text-center text-sm text-slate-500">No hotspots match the current filters.</td></tr></tbody>
+              <tbody><tr><td colSpan={9} className="py-8 px-4 text-center text-sm text-slate-500">No hotspots match the current filters.</td></tr></tbody>
             ) : (
               <tbody className="divide-y divide-slate-100">
                 {ordered.map((h) => (
@@ -544,6 +597,9 @@ function HotspotsTab() {
                       )}
                     </td>
                     <td className="py-3 px-4 text-xs text-slate-500">{h.updated_at ? new Date(h.updated_at).toLocaleDateString() : ''}</td>
+                    <td className="py-3 px-4">
+                      <ForumLink tid={threadMap.finding[h.key] ?? (h.rule_key ? threadMap.rule[h.rule_key] : undefined)} />
+                    </td>
                   </tr>
                 ))}
               </tbody>
