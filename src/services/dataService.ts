@@ -2,7 +2,7 @@ import {
   User, Forum, Thread, Comment, FeedPost, WorkRequest, Requirement, Agenda, Candidate,
   Harvest, OpenQuestion, OpenQuestionAnswer,
   TimelineEvent, Assessment, Observation, AgentRecord, Specification,
-  Plan, SpecItem, Counts, SearchResult
+  Plan, SpecItem, Counts, SearchResult, statusMeta
 } from '../types';
 import * as api from './apiClient';
 
@@ -994,9 +994,23 @@ class DataService {
     return liveItem('users', id);
   }
 
-  // ── Search (cached collections + API fire-and-forget) ─────────────
+  // ── Search (cached collections + threads + API fire-and-forget) ────
+  // Debounce/dedupe state for the server-side thread-title search.
+  // The local thread-cache scan below is synchronous; the server search
+  // (GET /api/forums/search/by-thread-title) covers ALL forums and merges
+  // in via emitChange when it lands.
+  private static threadSearchTimer: ReturnType<typeof setTimeout> | null = null;
+  private static threadSearchCache = new Map<string, SearchResult[]>();
+
   search(q: string): SearchResult[] {
-    if (!q || !q.trim()) return [];
+    if (!q || !q.trim()) {
+      if (DataService.threadSearchTimer) {
+        clearTimeout(DataService.threadSearchTimer);
+        DataService.threadSearchTimer = null;
+      }
+      DataService.threadSearchCache.clear();
+      return [];
+    }
     const query = q.toLowerCase();
 
     const results: SearchResult[] = [];
@@ -1022,6 +1036,73 @@ class DataService {
         }
       }
     }
+
+    // ── Threads: search forum thread titles ─────────────────────────
+    // (a) Synchronous scan of thread caches already loaded for visited
+    //     forums (_threads_<slug>). The old code only scanned the forum
+    //     containers, so thread titles never appeared in results.
+    const forums = liveList('forums') as Forum[];
+    const slugById = new Map<string, string>(forums.map((f) => [f.id, f.slug]));
+    const seenThreadIds = new Set<string>();
+    for (const key of Object.keys(liveCache ?? {})) {
+      if (!key.startsWith('_threads_')) continue;
+      const slug = key.slice('_threads_'.length);
+      const threads = (liveCache as Record<string, any>)[key] as Thread[];
+      if (!Array.isArray(threads)) continue;
+      for (const t of threads) {
+        const title = String(t?.title ?? '');
+        if (!title.toLowerCase().includes(query)) continue;
+        if (seenThreadIds.has(t.id)) continue;
+        seenThreadIds.add(t.id);
+        const forumSlug = (slug && slug !== 'undefined') ? slug : (slugById.get(t.forum?.id) || t.forum?.slug);
+        results.push({
+          type: 'Thread',
+          id: t.id,
+          title,
+          description: String(t?.body ?? '').slice(0, 120),
+          href: `/forums/${forumSlug || 'forums'}/${t.id}`,
+          status: statusMeta(t?.statusRating).label,
+        });
+      }
+    }
+
+    // (b) Server-side title search covers ALL forums (including ones whose
+    //     threads were never loaded locally). Fire-and-forget: results are
+    //     cached per-query, deduped against (a) by thread id, and merged at
+    //     the front of the Thread section; emitChange re-renders the modal.
+    const trimmed = q.trim();
+    const cached = DataService.threadSearchCache.get(trimmed);
+    if (cached) {
+      for (const r of cached) {
+        if (!seenThreadIds.has(r.id)) {
+          seenThreadIds.add(r.id);
+          results.unshift(r);
+        }
+      }
+    } else {
+      if (DataService.threadSearchTimer) clearTimeout(DataService.threadSearchTimer);
+      DataService.threadSearchTimer = setTimeout(() => {
+        DataService.threadSearchTimer = null;
+        api.searchThreadTitles(trimmed)
+          .then((rows) => {
+            if (!liveCache) return;
+            const mapped: SearchResult[] = (Array.isArray(rows) ? rows : [])
+              .filter((row: any) => row && row.title && row.id)
+              .map((row: any) => ({
+                type: 'Thread',
+                id: String(row.id),
+                title: String(row.title),
+                description: String(row.text ?? '').slice(0, 120),
+                href: `/forums/${slugById.get(row.forum_uuid) || 'forums'}/${row.id}`,
+                status: statusMeta(row.rating).label,
+              }));
+            DataService.threadSearchCache.set(trimmed, mapped);
+            emitChange();
+          })
+          .catch(() => { /* server search is best-effort; local scan still applies */ });
+      }, 250);
+    }
+
     return results;
   }
 

@@ -24,6 +24,7 @@ import {
  Sparkles
 } from 'lucide-react';
 import { dataService } from '../services/dataService';
+import { useLiveData } from '../context/LiveDataContext';
 import { SearchResult } from '../types';
 
 interface NavRoute {
@@ -60,6 +61,20 @@ export const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => 
  const inputRef = useRef<HTMLInputElement>(null);
  const resultsRef = useRef<HTMLDivElement>(null);
  const navigate = useNavigate();
+ const { version } = useLiveData();
+
+ // Entity search runs in an effect, not during render: the synchronous
+ // cache scan is cheap, but search() also schedules the debounced
+ // server-side thread-title lookup; its results merge in via
+ // emitChange -> version bump -> this effect re-runs and picks them up.
+ const [entityResults, setEntityResults] = useState<SearchResult[]>([]);
+ useEffect(() => {
+   if (!isOpen || !query.trim()) {
+     setEntityResults([]);
+     return;
+   }
+   setEntityResults(dataService.searchAll(query.trim()));
+ }, [isOpen, query, version]);
 
  // Focus input when modal opens
  useEffect(() => {
@@ -101,8 +116,7 @@ export const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => 
  r.category.toLowerCase().includes(query.toLowerCase())
  );
 
- // Search entities using dataService
- const entityResults: SearchResult[] = query.trim() ? dataService.searchAll(query.trim()) : [];
+ // Search entities using dataService (see effect above)
 
  // Combine items for unified keyboard navigation
  const combinedItems = [
