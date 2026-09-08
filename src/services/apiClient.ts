@@ -320,6 +320,14 @@ export async function searchApi(q: string): Promise<{ results: any[]; total: num
   return request(listUrl('/search', { q }));
 }
 
+// GET /api/forums/search/by-thread-title?title=<q> — server-side search
+// over ALL thread (root post) titles, not just locally-cached forums.
+// Returns raw posts rows: id, title, text, created, forum_uuid, rating.
+export async function searchThreadTitles(q: string): Promise<any[]> {
+  const result = await request<any[]>(listUrl('/forums/search/by-thread-title', { title: q }));
+  return Array.isArray(result) ? result : [];
+}
+
 // ── Health ───────────────────────────────────────────────────────────
 export async function fetchHealth(): Promise<{ status: string; service?: string; mode?: string }> {
   return request(listUrl('/health'));
