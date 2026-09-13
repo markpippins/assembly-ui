@@ -28,6 +28,7 @@ import {
  MoreVertical,
  Flag
 } from 'lucide-react';
+
 import { PageHeader } from '../components/PageHeader';
 import { TTSButton } from '../components/TTSButton';
 import { Tooltip } from '../components/Tooltip';
@@ -247,7 +248,7 @@ export const HarvestDetailView: React.FC = () => {
 
  // Filter discourse units
  const filteredUnits = discourseUnits.filter((unit) => {
- const role = unit.provenance?.role;
+ const role = unit.provenance?.role || '';
  if (roleFilter !== 'all' && role !== roleFilter) return false;
 
  if (searchQuery.trim()) {
@@ -594,11 +595,13 @@ export const HarvestDetailView: React.FC = () => {
  ) : (
  /* Aggregated Document Turns */
  filteredUnits.map((unit, idx) => {
- const role = unit.provenance?.role || (unit.heading?.includes('user') ? 'user' : 'assistant');
+ const rawRole = unit.provenance?.role || '';
+ const role = rawRole === 'user' ? 'user' : rawRole === 'assistant' ? 'assistant' : 'unknown';
  const isAssistant = role === 'assistant';
+ const isUser = role === 'user';
  const isCollapsed = collapsedTurns[idx];
  const turnKey = `turn-${idx}`;
- const turnTitle = unit.heading || `Turn ${idx + 1}`;
+ const turnTitle = role && role !== 'unknown' ? ROLE_LABEL(role) : `Turn ${idx + 1}`;
  const isTurnFlagged = !!flaggedItems[turnKey];
  const isTurnMenuOpen = activeContextMenuKey === turnKey;
  const turnBody = unit.body || '';
@@ -625,7 +628,9 @@ export const HarvestDetailView: React.FC = () => {
  ? 'bg-amber-50/60 border-amber-200 '
  : isAssistant
  ? 'bg-slate-50/70 border-slate-100 '
- : 'bg-emerald-50/40 border-emerald-100 '
+ : isUser
+ ? 'bg-emerald-50/40 border-emerald-100 '
+ : 'bg-gray-50/70 border-gray-100 '
  }`}
  >
  <div className="flex items-center gap-3">
@@ -635,10 +640,12 @@ export const HarvestDetailView: React.FC = () => {
  ? 'bg-amber-100 text-amber-600 border-amber-300 '
  : isAssistant
  ? 'bg-indigo-50 text-indigo-600 border-indigo-200 '
- : 'bg-emerald-50 text-emerald-600 border-emerald-200 '
+ : isUser
+ ? 'bg-emerald-50 text-emerald-600 border-emerald-200 '
+ : 'bg-gray-100 text-gray-500 border-gray-200 '
  }`}
  >
- {isAssistant ? <Bot className="w-5 h-5" /> : <User className="w-5 h-5" />}
+ {isAssistant ? <Bot className="w-5 h-5" /> : isUser ? <User className="w-5 h-5" /> : <Hash className="w-5 h-5" />}
  </div>
 
  <div>
@@ -651,10 +658,12 @@ export const HarvestDetailView: React.FC = () => {
  className={`text-[10px] font-mono uppercase font-bold px-2 py-0.5 rounded-full ${
  isAssistant
  ? 'bg-indigo-100 text-indigo-700 '
- : 'bg-emerald-100 text-emerald-700 '
+ : isUser
+ ? 'bg-emerald-100 text-emerald-700 '
+ : 'bg-gray-100 text-gray-500 '
  }`}
  >
- {role}
+ {role === 'unknown' ? 'unknown' : role}
  </span>
 
  {isTurnFlagged && (
@@ -665,9 +674,11 @@ export const HarvestDetailView: React.FC = () => {
  )}
  </div>
 
- <p className="text-[11px] text-slate-500 font-mono">
- {unit.provenance?.blockCount || unit.blocks?.length || 0} blocks aggregated • Turn Index #{unit.provenance?.turnIndex ?? idx}
+ {unit.heading && (
+ <p className="text-[11px] text-slate-500 font-mono truncate max-w-md mt-1" title={unit.heading}>
+ {unit.heading}
  </p>
+ )}
  </div>
  </div>
 
