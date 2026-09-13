@@ -206,10 +206,33 @@ export const HarvestDetailView: React.FC = () => {
  const stats = docklang?.stats || {};
  // Real docklang payloads use snake_case keys (discourse_units, total_units,
  // total_blocks, by_type); older fixtures used camelCase. Accept both.
- const discourseUnits: any[] = docklang?.discourseUnits || docklang?.discourse_units || [];
- const totalUnits = stats?.totalUnits ?? stats?.total_units ?? discourseUnits.length;
+ const rawUnits: any[] = docklang?.discourseUnits || docklang?.discourse_units || [];
+ const totalUnits = stats?.totalUnits ?? stats?.total_units ?? rawUnits.length;
  const totalBlocks = stats?.totalBlocks ?? stats?.total_blocks ?? 0;
  const byType = stats?.byType || stats?.by_type || {};
+
+ // Blocks are the real turn source. Each block carries its own
+ // provenance.role (user|assistant); the unit-level role is the ARC owner
+ // (user-led arcs are all role:'user' at unit level) and must not be used
+ // for turn styling. Flatten units → per-block turns so the transcript view
+ // renders User/Assistant boundaries at the actual turn exchange.
+ const discourseUnits: any[] = rawUnits.flatMap((unit: any, uIdx: number) =>
+ (Array.isArray(unit.blocks) && unit.blocks.length > 0
+ ? unit.blocks
+ : [{ type: 'paragraph', content: unit.body, provenance: { role: unit.provenance?.role } }]
+ ).map((block: any, bIdx: number, blocks: any[]) => ({
+ ...block,
+ provenance: {
+ ...(block.provenance || {}),
+ role: block.provenance?.role || unit.provenance?.role,
+ },
+ // Arc context: segment heading + block position within the arc.
+ segHeading: unit.heading,
+ segIndex: unit.provenance?.segment_index ?? uIdx,
+ blockInSeg: bIdx,
+ blocksInSeg: blocks.length,
+ }))
+ );
 
  const title = meta.title || harvest.sourceFilename || `Harvest ${harvest.id}`;
  const provenance = meta.provenance || {};
@@ -246,15 +269,15 @@ export const HarvestDetailView: React.FC = () => {
  showToast(`Copied content for ${turnTitle}`, 'success');
  };
 
- // Filter discourse units
+ // Filter per-block turns
  const filteredUnits = discourseUnits.filter((unit) => {
  const role = unit.provenance?.role || '';
  if (roleFilter !== 'all' && role !== roleFilter) return false;
 
  if (searchQuery.trim()) {
  const q = searchQuery.toLowerCase();
- const bodyMatches = unit.body?.toLowerCase().includes(q);
- const headingMatches = unit.heading?.toLowerCase().includes(q);
+ const bodyMatches = (unit.content || unit.body || '').toLowerCase().includes(q);
+ const headingMatches = unit.segHeading?.toLowerCase().includes(q);
  return bodyMatches || headingMatches;
  }
 
@@ -593,7 +616,7 @@ export const HarvestDetailView: React.FC = () => {
  )}
  </div>
  ) : (
- /* Aggregated Document Turns */
+ /* Aggregated Document Turns — one card per BLOCK (real turn) */
  filteredUnits.map((unit, idx) => {
  const rawRole = unit.provenance?.role || '';
  const role = rawRole === 'user' ? 'user' : rawRole === 'assistant' ? 'assistant' : 'unknown';
@@ -601,10 +624,10 @@ export const HarvestDetailView: React.FC = () => {
  const isUser = role === 'user';
  const isCollapsed = collapsedTurns[idx];
  const turnKey = `turn-${idx}`;
- const turnTitle = role && role !== 'unknown' ? ROLE_LABEL(role) : `Turn ${idx + 1}`;
+ const turnTitle = role !== 'unknown' ? (role === 'user' ? 'User' : 'Assistant') : `Turn ${idx + 1}`;
  const isTurnFlagged = !!flaggedItems[turnKey];
  const isTurnMenuOpen = activeContextMenuKey === turnKey;
- const turnBody = unit.body || '';
+ const turnBody = unit.content || unit.body || '';
 
  return (
  <div
@@ -674,9 +697,9 @@ export const HarvestDetailView: React.FC = () => {
  )}
  </div>
 
- {unit.heading && (
- <p className="text-[11px] text-slate-500 font-mono truncate max-w-md mt-1" title={unit.heading}>
- {unit.heading}
+ {unit.segHeading && unit.blockInSeg === 0 && (
+ <p className="text-[11px] text-slate-500 font-mono truncate max-w-md mt-1" title={unit.segHeading}>
+ Segment {unit.segIndex + 1}: {unit.segHeading}
  </p>
  )}
  </div>
@@ -717,11 +740,10 @@ export const HarvestDetailView: React.FC = () => {
  </div>
  </div>
 
- {/* Turn Aggregated Document Body */}
+ {/* Turn content — the card IS the block; render it by type */}
  {!isCollapsed && (
  <div className="p-6 sm:p-8 space-y-4 font-sans leading-relaxed text-slate-800 text-sm">
- {Array.isArray(unit.blocks) && unit.blocks.length > 0 ? (
- unit.blocks.map((block: any, bIdx: number) => {
+ {[unit].map((block: any, bIdx: number) => {
  const type = block.type || 'paragraph';
  const blockKey = `turn-${idx}-block-${bIdx}`;
  const blockTitle = `Block #${bIdx + 1} (${type})`;
@@ -867,12 +889,7 @@ export const HarvestDetailView: React.FC = () => {
  </p>
  </div>
  );
- })
- ) : (
- <div className="leading-relaxed text-sm text-slate-800 ">
- <MarkdownRenderer content={unit.body || ''} />
- </div>
- )}
+ })}
  </div>
  )}
  </div>
