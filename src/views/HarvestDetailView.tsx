@@ -226,8 +226,9 @@ export const HarvestDetailView: React.FC = () => {
  ...(block.provenance || {}),
  role: block.provenance?.role || unit.provenance?.role,
  },
- // Arc context: segment heading + block position within the arc.
- segHeading: unit.heading,
+ // Arc context: block position within the arc. The auto-generated arc
+ // heading is dropped as a label — it repeated across many comments and
+ // never matched content reliably.
  segIndex: unit.provenance?.segment_index ?? uIdx,
  blockInSeg: bIdx,
  blocksInSeg: blocks.length,
@@ -277,8 +278,7 @@ export const HarvestDetailView: React.FC = () => {
  if (searchQuery.trim()) {
  const q = searchQuery.toLowerCase();
  const bodyMatches = (unit.content || unit.body || '').toLowerCase().includes(q);
- const headingMatches = unit.segHeading?.toLowerCase().includes(q);
- return bodyMatches || headingMatches;
+ return bodyMatches;
  }
 
  return true;
@@ -690,20 +690,13 @@ export const HarvestDetailView: React.FC = () => {
  </span>
 
  {isTurnFlagged && (
- <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-100 text-amber-700 border border-amber-300 ">
- <Flag className="w-3 h-3 fill-amber-500 text-amber-500" />
- Flagged for Review
- </span>
- )}
- </div>
-
- {unit.segHeading && unit.blockInSeg === 0 && (
- <p className="text-[11px] text-slate-500 font-mono truncate max-w-md mt-1" title={unit.segHeading}>
- Segment {unit.segIndex + 1}: {unit.segHeading}
- </p>
- )}
- </div>
- </div>
+ <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-100 text-amber-700 border border-amber-300 ">        <Flag className="w-3 h-3 fill-amber-500 text-amber-500" />
+          Flagged for Review
+        </span>
+      )}
+    </div>
+  </div>
+</div>
 
  <div className="flex items-center gap-2">
  <button
