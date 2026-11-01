@@ -67,15 +67,49 @@ export async function initDataService(): Promise<void> {
     // Seed the per-collection total tracker from boot counts so the first
     // background poll can skip unchanged heavy collections immediately.
     if (data.counts) (liveCache as any)._totals = { ...data.counts };
+    // Background-fill the remaining candidate pages (boot payload is page
+    // 1 only — see apiClient.loadAllData); emits once the full list lands.
+    ensureCandidatesFull();
+    // Background-fill the full agent-records list WITH bodies (boot payload
+    // is page 1 only, no content — see apiClient.loadAllData). Single-flight
+    // + 60s cooldown inside; a dev double-mount boot is inert.
+    ensureAgentRecordContent();
     // Pre-populate per-forum thread caches so ForumDetailView renders
     // threads immediately without lazy-load delay.
     const bySlug = (data as any)._threadsBySlug;
     if (bySlug) {
       for (const [slug, threads] of Object.entries(bySlug)) {
-        (liveCache as any)['_threads_' + slug] = threads;
+        // A second boot init (dev double-mount) can land a fresh page-1 while
+        // a previous fill already walked deeper pages — union instead of
+        // replacing so the filled rows aren't dropped.
+        const existing = (liveCache as any)['_threads_' + slug];
+        const filledThrough = threadsFillTotals[slug];
+        if (
+          Array.isArray(existing) && filledThrough != null &&
+          (threads as any[]).length < filledThrough
+        ) {
+          (liveCache as any)['_threads_' + slug] = unionById(existing, threads as any[]);
+        } else {
+          (liveCache as any)['_threads_' + slug] = threads;
+        }
+      }
+      // Envelope totals from the page-1 fetches; the fill uses them to
+      // decide which forums need more pages. Seed the filled-up-to tracker
+      // too: forums whose page 1 already covers the whole list are done.
+      const totals = (data as any)._threadsTotals;
+      if (totals) (liveCache as any)._threadsTotal = { ...totals };
+      const bySlug2 = (liveCache as any)._threadsTotal;
+      if (bySlug2) {
+        for (const [slug, total] of Object.entries(bySlug2)) {
+          threadsFillTotals[slug] =
+            typeof total === 'number' && total <= THREADS_PAGE_SIZE ? (total as number) : null;
+        }
       }
     }
-    console.log('[dataService] Live data loaded:', {
+    // Background-fill the remaining per-forum thread pages (boot payload is
+    // page 1 only); emits when a forum's full list lands.
+    ensureThreadsFull();
+    console.log('[dataService] Live data loaded at t=' + Math.round(performance.now()) + 'ms:', {
       forums: data.forums?.length,
       threads: 'loaded on demand',
       feed: data.feed?.length,
@@ -113,6 +147,7 @@ export async function initDataService(): Promise<void> {
 const FULL_RESYNC_EVERY = 20;
 // counts-endpoint key → collection name for the heavy collections.
 const HEAVY_COUNT_KEYS: Record<string, string> = {
+  candidates: 'candidates',
   agentRecords: 'agent-records',
   harvests: 'harvests',
 };
@@ -230,6 +265,20 @@ export async function refreshDataService(): Promise<boolean> {
       if (!Array.isArray((data as any)[key])) continue;
       // Skip a key we just delta-merged above (its full list wasn't pulled).
       if (deltaJobs.some((j) => j.key === key)) continue;
+      // Candidates is handled by the delta path + ensureCandidatesFull():
+      // loadAllData payloads carry only page 1 (~100 rows) and merging them
+      // here would replace the full cached list (~11.7k rows) with that page.
+      if (key === 'candidates') continue;
+      // Agent-records is the same deal (page-1-only boot payload): union
+      // the fresh page 1 on top instead of replacing, so the background
+      // fill's deeper rows aren't dropped each resync.
+      if (key === 'agentRecords') {
+        if (Array.isArray(cache.agentRecords) && Array.isArray((data as any).agentRecords)) {
+          cache.agentRecords = unionById(cache.agentRecords, (data as any).agentRecords);
+          changed = true;
+        }
+        continue;
+      }
       cache[key] = mergeList(cache[key], (data as any)[key]);
       changed = true;
     }
@@ -240,19 +289,65 @@ export async function refreshDataService(): Promise<boolean> {
     applyAgentRecordContent();
 
     // 3c. Per-forum thread lists ship pre-fetched with loadAllData (when not
-    // skipped).
+    // skipped). Page 1 only now — the background fill (kick below) walks the
+    // rest, same deal as the candidates core-merge above.
     const bySlug = (data as any)._threadsBySlug;
     if (bySlug && Object.keys(bySlug).length > 0) {
+      const totalsPayload = (data as any)._threadsTotals ?? {} as Record<string, number | null>;
       for (const [slug, threads] of Object.entries(bySlug)) {
         const key = '_threads_' + slug;
-        cache[key] = mergeList(cache[key], threads as any[]);
+        const existing = cache[key];
+        const incoming = threads as any[];
+        // A forum whose fill completed (or is walking) holds more rows than a
+        // poll's page-1 payload — union so the deeper rows survive; otherwise
+        // plain merge (full replace heals deletions on non-filled forums).
+        const filledThrough = threadsFillTotals[slug];
+        cache[key] =
+          Array.isArray(existing) && filledThrough != null && incoming.length < filledThrough
+            ? unionById(existing, incoming)
+            : mergeList(existing, incoming);
+        // Re-open the fill only when the forum's total moved since the last
+        // completed fill — not on every poll: completed forums stay closed,
+        // and cooldown still paces the occasional re-walk.
+        const totalNow = totalsPayload[slug];
+        if (
+          typeof totalNow === 'number' && totalNow > THREADS_PAGE_SIZE &&
+          threadsFillTotals[slug] !== totalNow
+        ) {
+          threadsFillTotals[slug] = null;
+        }
       }
+      (cache as any)._threadsTotal = { ...((cache as any)._threadsTotal ?? {}), ...totalsPayload };
       changed = true;
     }
+    // Heal page-1-only thread caches that a fill hasn't walked yet
+    // (boot kicked one, but a drift poll replaced the page-1 rows before it
+    // finished, or a previous kick was cooldown-suppressed). The fill's own
+    // 60s cooldown keeps this from re-walking every cycle.
+    ensureThreadsFull();
 
     // 4. Persist the totals snapshot so future polls can gate on it.
     if (counts) {
       for (const k of Object.keys(counts)) storedTotals[k] = counts[k];
+    }
+
+    // Candidates drift beyond the delta path's small margin (delete storms,
+    // big harvest batches) is healed by the background full fill; the fill's
+    // own 60s cooldown keeps this from re-walking on every cycle.
+    if (
+      counts?.candidates != null && candidatesFullTotal !== null &&
+      Math.abs(counts.candidates - candidatesFullTotal) > DELTA_MAX_ROWS
+    ) {
+      ensureCandidatesFull();
+    }
+    // Agent-records: re-open the full list+content fill while the cache
+    // isn't known-complete for the server's total (inserts push new rows
+    // onto page 1; incomplete walks and deletions converge on these).
+    if (
+      counts?.agentRecords != null &&
+      counts.agentRecords !== agentFillTotal
+    ) {
+      ensureAgentRecordContent();
     }
 
     if (changed) emitChange();
@@ -268,6 +363,25 @@ export async function refreshDataService(): Promise<boolean> {
 // counterpart appears (matched by id once create-acks reconcile them).
 function isLocalOnlyId(id: unknown): boolean {
   return typeof id === 'string' && /^[a-z]+-\d{10,}$/.test(id);
+}
+
+// Union with id dedupe: fresh rows lead (newest-first server order), then
+// any still-touched rows that the fresh pages didn't include (deeper pages
+// from a previous background fill, optimistic local rows). Stale server rows
+// drop out on the next complete walk; deleted ones heal via drift resync.
+function unionById(existing: any[], fresh: any[]): any[] {
+  const seen = new Set<string>();
+  const out: any[] = [];
+  const push = (row: any) => {
+    if (row?.id == null) { out.push(row); return; }
+    const key = String(row.id);
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(row);
+  };
+  for (const row of fresh) push(row);
+  for (const row of existing) push(row);
+  return out;
 }
 
 function mergeList(existing: any[] | undefined, fresh: any[]): any[] {
@@ -380,6 +494,9 @@ function resolveUser(postedById: string | undefined, users: User[]): User {
 const AGENT_CONTENT_RETRY_MS = 60 * 1000;
 let agentContentLastAttempt = 0;
 let agentContentInFlight = false;
+// Total the cache is known-complete through (set by the full fill; null =
+// cache is page-1-only or the walk never ran).
+let agentFillTotal: number | null = null;
 const agentDetailAttempted = new Set<string>();
 
 function agentContentMap(): Record<string, string> {
@@ -403,7 +520,13 @@ function applyAgentRecordContent(): void {
 
 /** One-time background fetch of all agent-record bodies (60s retry cooldown).
  *  Walks pages with bounded concurrency — a sequential chain of ~82 pages
- *  took minutes on a loaded machine. */
+ *  took minutes on a loaded machine.
+ *
+ *  Since the boot payload became page-1-only (list without bodies), this
+ *  walk also owns the full LIST: page 1 is re-fetched fresh with content so
+ *  interleaved boot writes can't shift the basis, the completed list wholly
+ *  replaces the cache (deletions heal), and agentFillTotal lets the refresh
+ *  cycle re-open the walk when the server-side total moves. */
 function ensureAgentRecordContent(): void {
   if (!liveCache || agentContentInFlight) return;
   if (Date.now() - agentContentLastAttempt < AGENT_CONTENT_RETRY_MS) return;
@@ -414,8 +537,9 @@ function ensureAgentRecordContent(): void {
 
   api.fetchCollectionPage('agent-records', 1, { includeContent: true, pageSize: PAGE_SIZE })
     .then(async (first) => {
+      const started = performance.now();
       // Sparse array indexed by row position keeps list ordering; holes are
-      // dropped below so a failed page costs its rows, not the whole load.
+      // avoided below so a failed page costs its rows, not the whole load.
       const slots: any[] = [];
       const place = (page: number, items: any[]) => {
         for (let i = 0; i < items.length; i++) slots[(page - 1) * PAGE_SIZE + i] = items[i];
@@ -423,11 +547,114 @@ function ensureAgentRecordContent(): void {
       place(1, first.items);
       const totalPages = Math.ceil(first.total / PAGE_SIZE);
       let next = 2;
+      const flaked = new Set<number>();
       const worker = async (): Promise<void> => {
         while (next <= totalPages) {
           const page = next++;
           try {
             place(page, (await api.fetchCollectionPage('agent-records', page, { includeContent: true, pageSize: PAGE_SIZE })).items);
+          } catch { flaked.add(page); /* heal below */ }
+        }
+      };
+      await Promise.all(
+        Array.from({ length: Math.min(CONCURRENCY, Math.max(0, totalPages - 1)) }, worker)
+      );
+      // One retry round for pages that flaked mid-walk — the backend has
+      // transient bursts under concurrent fills which vanish on retry.
+      if (flaked.size > 0) {
+        const retrySlots = [...flaked].map((p) => ({ p, ok: false }));
+        const rNext = { index: 0 };
+        const retryWorker = async (): Promise<void> => {
+          while (rNext.index < retrySlots.length) {
+            const slot = retrySlots[rNext.index++];
+            try {
+              place(slot.p, (await api.fetchCollectionPage('agent-records', slot.p, { includeContent: true, pageSize: PAGE_SIZE })).items);
+              slot.ok = true;
+            } catch { /* still missing — leave the cache as-is */ }
+          }
+        };
+        await Promise.all(Array.from({ length: Math.min(3, retrySlots.length) }, retryWorker));
+        for (const slot of retrySlots) {
+          if (slot.ok) flaked.delete(slot.p); else flaked.add(slot.p);
+        }
+      }
+      if (!liveCache) return;
+      const complete = flaked.size === 0;
+      const full = slots.filter(Boolean);
+      const map = agentContentMap();
+      for (const rec of full as AgentRecord[]) {
+        if (rec?.id != null && rec.content != null) map[rec.id] = rec.content;
+      }
+      if (complete) {
+        // Wholly replace so deleted server rows heal.
+        liveCache.agentRecords = full;
+        applyAgentRecordContent();
+        console.log(
+          '[dataService] agent-records fill done: rows=' + full.length +
+          ' fillMs=' + Math.round(performance.now() - started) +
+          ' atT=' + Math.round(started) + 'ms'
+        );
+      } else {
+        // Incomplete walk: don't swap (it would arm-vent rows we already
+        // have). Leave agentFillTotal unset — the refresh cycle re-kicks
+        // after the cooldown and the walk converges.
+        agentFillTotal = null;
+        console.warn(
+          '[dataService] agent-records fill incomplete: ' + flaked.size +
+          ' of ' + totalPages + ' page(s) missed; re-walk scheduled'
+        );
+      }
+      emitChange();
+    })
+    .catch((err) => {
+      agentFillTotal = null;
+      console.warn('[dataService] agent-record content load failed:', err);
+    })
+    .finally(() => { agentContentInFlight = false; });
+}
+
+// ── Harvest-candidate full-list fill (background) ───────────────────
+// The boot payload carries only page 1 of harvest candidates (≈11.7k rows
+// in prod — a full walk of 117 sequential ≈140ms pages blocked first render
+// ~16s). This mirrors the agent-record content flow: bounded-concurrency
+// page walk that swaps the full list into the cache and emits so mounted
+// views re-read. Single-flight with a cooldown; re-kicked by
+// refreshDataService when the row count drifts beyond the delta margin.
+
+const CANDIDATES_Fill_COOLDOWN_MS = 60 * 1000;
+let candidatesFillInFlight = false;
+let candidatesFillLastAttempt = 0;
+let candidatesFullTotal: number | null = null;
+
+function ensureCandidatesFull(): void {
+    if (!liveCache || candidatesFillInFlight) return;
+  if (
+    candidatesFullTotal !== null &&
+    Date.now() - candidatesFillLastAttempt < CANDIDATES_Fill_COOLDOWN_MS
+  ) return;
+  candidatesFillInFlight = true;
+  candidatesFillLastAttempt = Date.now();
+  const PAGE_SIZE = 100;
+  const CONCURRENCY = 6;
+
+  const fillStarted = performance.now();
+  api.fetchCollectionPage('candidates', 1, { pageSize: PAGE_SIZE })
+    .then(async (first) => {
+      // Sparse slots indexed by row position preserve list ordering; holes
+      // are dropped below so a failed page costs its rows, not the whole
+      // load (same pattern as the agent-record content walk).
+      const slots: any[] = [];
+      const place = (page: number, items: any[]) => {
+        for (let i = 0; i < items.length; i++) slots[(page - 1) * PAGE_SIZE + i] = items[i];
+      };
+      place(1, first.items);
+      const totalPages = Math.max(Math.ceil(first.total / PAGE_SIZE), 1);
+      let next = 2;
+      const worker = async (): Promise<void> => {
+        while (next <= totalPages) {
+          const page = next++;
+          try {
+            place(page, (await api.fetchCollectionPage('candidates', page, { pageSize: PAGE_SIZE })).items);
           } catch { /* skip failed page */ }
         }
       };
@@ -435,19 +662,139 @@ function ensureAgentRecordContent(): void {
         Array.from({ length: Math.min(CONCURRENCY, Math.max(0, totalPages - 1)) }, worker)
       );
       if (!liveCache) return;
-      const full = slots.filter(Boolean);
-      const map = agentContentMap();
-      for (const rec of full as AgentRecord[]) {
-        if (rec?.id != null && rec.content != null) map[rec.id] = rec.content;
-      }
-      liveCache.agentRecords = full;
-      applyAgentRecordContent();
+      // Deduplicate by id — unstable server ordering can overlap rows
+      // across pages (same reason listAll dedupes in apiClient).
+      const seen = new Set<string>();
+      const full = slots.filter(Boolean).filter((c: any) => {
+        if (c?.id == null) return true; // null-id rows still render
+        const key = String(c.id);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      candidatesFullTotal = first.total;
+      const existing = (liveCache.candidates ?? []) as Candidate[];
+      // Keep optimistic client-only rows until their server ack lands.
+      const localOnly = existing.filter(
+        (e) => isLocalOnlyId(e?.id) && !seen.has(String(e.id))
+      );
+      liveCache.candidates = localOnly.length > 0 ? [...localOnly, ...full] : full;
+      const totals = ((liveCache as any)._totals ??= {}) as Record<string, number>;
+      totals.candidates = first.total;
       emitChange();
+      console.log(
+        '[dataService] candidates fill done: rows=' + full.length +
+        ' pages=' + totalPages +
+        ' fillMs=' + Math.round(performance.now() - fillStarted) +
+        ' atT=' + Math.round(fillStarted) + 'ms'
+      );
     })
     .catch((err) => {
-      console.warn('[dataService] agent-record content load failed:', err);
+      console.warn('[dataService] harvest-candidate full load failed:', err);
     })
-    .finally(() => { agentContentInFlight = false; });
+    .finally(() => { candidatesFillInFlight = false; });
+}
+
+// ── Per-forum full-list thread fill (background) ────────────────────
+// Same shape as the candidates fill: this walk re-fetches page 1 FRESH per
+// open forum (so deleted rows heal and interleaved boot writes can't shift
+// the basis) plus pages 2..N with bounded concurrency, then swaps the
+// complete list into the per-forum cache. Failed pages cost their own rows;
+// the next kick (cooldown-gated) heals. Deep pages use bodyWindow=20 —
+// bodies are fetched on demand by the detail view.
+const THREADS_PAGE_SIZE = 500;
+const THREADS_FILL_CONCURRENCY = 4;
+const THREADS_FILL_COOLDOWN_MS = 60 * 1000;
+let threadsFillInFlight = false;
+let threadsFillLastAttempt = 0;
+// slug → total the cache is known-complete through; null = page 1 only.
+const threadsFillTotals: Record<string, number | null> = {};
+
+function ensureThreadsFull(): void {
+  if (!liveCache || threadsFillInFlight) return;
+  if (Date.now() - threadsFillLastAttempt < THREADS_FILL_COOLDOWN_MS) return;
+  const forumList = (liveCache.forums ?? []) as Array<{ slug: string }>;
+  const totals = ((liveCache as any)._threadsTotal ?? {}) as Record<string, number | null>;
+  // Only walk forums whose cache is confirmed page-1-only. After a complete
+  // fill, threadsFillTotals[slug] tracks "filled through" so every poll
+  // doesn't re-trigger a full re-walk.
+  const open = forumList.filter(
+    (f) => typeof totals[f.slug] === 'number' &&
+      (totals[f.slug] as number) > THREADS_PAGE_SIZE &&
+      threadsFillTotals[f.slug] === null
+  );
+  if (open.length === 0) return;
+  threadsFillInFlight = true;
+  threadsFillLastAttempt = Date.now();
+  const fillStarted = performance.now();
+
+  // slug → sparse flat array of fetched rows (index = zero-based global
+  // row position across that forum's pages; holes are failed pages).
+  const slots: Record<string, (any | undefined)[]> = {};
+  for (const f of open) slots[f.slug] = [];
+  const tasks: Array<{ slug: string; page: number }> = [];
+  for (const f of open) {
+    const totalPages = Math.ceil((totals[f.slug] as number) / THREADS_PAGE_SIZE);
+    for (let page = 1; page <= totalPages; page++) tasks.push({ slug: f.slug, page });
+  }
+  let next = 0;
+  const worker = async (): Promise<void> => {
+    while (next < tasks.length) {
+      const job = tasks[next++];
+      try {
+        // Recent-window preview policy only: boot renders previews from its
+        // own page-1 seed; the detail view fetches older bodies on demand.
+        const envelope = await api.fetchThreadsPage(
+          job.slug, job.page,
+          { bodyWindow: 20 },
+        );
+        for (let i = 0; i < envelope.items.length; i++) {
+          slots[job.slug][(job.page - 1) * THREADS_PAGE_SIZE + i] = envelope.items[i];
+        }
+      } catch { /* skip failed page; next kick heals */ }
+    }
+  };
+  Promise.all(
+    Array.from({ length: Math.min(THREADS_FILL_CONCURRENCY, tasks.length) }, worker)
+  )
+    .then(() => {
+      if (!liveCache) return;
+      let changed = false;
+      for (const f of open) {
+        const slug = f.slug;
+        const seen = new Set<string>();
+        const prev = ((liveCache as any)['_threads_' + slug] ?? []) as any[];
+        // Keep optimistic client-only threads across the swap.
+        const localOnly = prev.filter((t: any) => isLocalOnlyId(t?.id));
+        const full: any[] = [];
+        for (const row of localOnly) { full.push(row); if (row?.id != null) seen.add(String(row.id)); }
+        // Fresh rows lead after optimistic rows; null-id rows keep
+        // rendering with fallback keys.
+        for (const row of slots[slug]) {
+          if (!row) continue;
+          if (row?.id == null) { full.push(row); continue; }
+          const key = String(row.id);
+          if (seen.has(key)) continue;
+          seen.add(key);
+          full.push(row);
+        }
+        if ((liveCache as any)['_threads_' + slug] !== full) {
+          (liveCache as any)['_threads_' + slug] = full;
+          threadsFillTotals[slug] = typeof totals[slug] === 'number' ? (totals[slug] as number) : null;
+          changed = true;
+        }
+      }
+      console.log(
+        '[dataService] threads fill done: forums=' + open.length +
+        ' fillMs=' + Math.round(performance.now() - fillStarted) +
+        ' atT=' + Math.round(fillStarted) + 'ms'
+      );
+      if (changed) emitChange();
+    })
+    .catch((err) => {
+      console.warn('[dataService] threads full load failed:', err);
+    })
+    .finally(() => { threadsFillInFlight = false; });
 }
 
 class DataService {
@@ -532,8 +879,8 @@ class DataService {
     (liveCache as any)[cacheKey] = [];
     const forum = this.getForums().find((f: Forum) => f.slug === slug);
     const policy = forum ? api.threadBodyPolicy(forum.threadCount) : {};
-    api.fetchThreads(slug, policy).then(threads => {
-      if (liveCache) (liveCache as any)[cacheKey] = threads;
+    api.fetchThreadsPage(slug, 1, policy).then(list => {
+      if (liveCache) (liveCache as any)[cacheKey] = list.items;
     }).catch(() => {});
     return [];
   }
