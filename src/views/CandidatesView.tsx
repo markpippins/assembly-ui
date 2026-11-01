@@ -5,13 +5,17 @@ import { PageHeader } from '../components/PageHeader';
 import { StatusBadge } from '../components/StatusBadge';
 import { dataService } from '../services/dataService';
 import { useLiveData } from '../context/LiveDataContext';
+import { useWindowed, WindowFooter } from '../utils/useWindowed';
 import { formatDateTime } from '../utils/format';
 import { idBadge } from '../utils/idFormat';
 import { Candidate } from '../types';
 
 export const CandidatesView: React.FC = () => {
- const { version } = useLiveData();
- const [candidates, setCandidates] = useState<Candidate[]>([]);
+ const { version } = useLiveData();  const [candidates, setCandidates] = useState<Candidate[]>([]);
+
+  // ~11.7k cards render ~ much too slow to mount at once; ramp with the
+  // window (list length is stable per snapshot, so no resetKey needed).
+  const candWindow = useWindowed(candidates.length, 120);
 
  useEffect(() => {
  setCandidates(dataService.getCandidates());
@@ -26,7 +30,7 @@ export const CandidatesView: React.FC = () => {
  />
 
  <div className="space-y-4">
- {candidates.map((cand) => (
+ {candWindow.slice(candidates).map((cand) => (
  <div
  key={cand.id}
  className="app-panel p-4 space-y-3 hover:border-slate-600 transition-all"
@@ -78,10 +82,16 @@ export const CandidatesView: React.FC = () => {
  <span>View Candidate</span>
  <ChevronRight className="w-3.5 h-3.5" />
  </RouterLink>
- </div>
- </div>
- ))}
- </div>
+ </div>  </div>
+  ))}
+  <WindowFooter
+  sentinelRef={candWindow.sentinelRef}
+  visibleCount={candWindow.visibleCount}
+  total={candidates.length}
+  onMore={() => candWindow.more()}
+  noun="candidates"
+  />
+  </div>
  </div>
  );
 };

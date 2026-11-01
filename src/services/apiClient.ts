@@ -111,6 +111,24 @@ export async function fetchThreads(slug: string, bodyPolicy?: { includeBody?: bo
   return listAll<any>(`/forums/${slug}/threads`, params, API_BASE, 500);
 }
 
+// Single page fetch for the thread lists. Boot and background polls use
+// page 1 only; dataService.ensureThreadsFull() walks the remaining pages
+// with bounded concurrency (mirrors the candidates fill).
+export async function fetchThreadsPage(
+  slug: string,
+  page: number,
+  bodyPolicy?: { includeBody?: boolean; bodyWindow?: number },
+  pageSize: number = 500,
+): Promise<ListEnvelope<any>> {
+  const params: Record<string, string> = {
+    page: String(page),
+    pageSize: String(pageSize),
+  };
+  if (bodyPolicy?.includeBody) params.includeBody = 'true';
+  if (bodyPolicy?.bodyWindow) params.bodyWindow = String(bodyPolicy.bodyWindow);
+  return request<ListEnvelope<any>>(listUrl(`/forums/${slug}/threads`, params, API_BASE));
+}
+
 export async function createThread(slug: string, data: { title: string; body: string; postedById?: string; role?: string | null; model?: string | null }) {
   return request<any>(listUrl(`/forums/${slug}/threads`), {
     method: 'POST',
@@ -362,6 +380,15 @@ export async function fetchAgendaItems(agendaId: string): Promise<any[]> {
 // rows on a slow TOAST-heavy query): 'agent-records' and 'harvests'.
 // Background polls omit them via includeHeavy:false and pull deltas
 // separately (see dataService.refreshDataService).
+//
+// Of these, 'agent-records' now ALSO ships page 1 only at boot (its full
+// list walk is pure boot cost, and the walk without bodies was duplicated
+// again by the content fill); dataService.ensureAgentRecordContent()
+// background-fills the full list with bodies.
+// 'candidates' is heavier still in prod (≈11.7k rows → 117 sequential ~140ms
+// pages that blocked first render ~16s). Its boot payload is page 1 only;
+// dataService.ensureCandidatesFull() background-fills the remaining pages
+// with bounded concurrency and swaps the full list into the cache.
 
 export interface LoadAllDataOpts {
   /** Omit heavy collections from the result (default: include them). */
@@ -400,13 +427,24 @@ export async function loadAllData(opts: LoadAllDataOpts = {}): Promise<Record<st
     safe(fetchCollection('work-requests'), 'work-requests'),
     safe(fetchCollection('requirements'), 'requirements'),
     safe(fetchCollection('agendas'), 'agendas'),
-    safe(fetchCollection('candidates'), 'candidates'),
+    // Page 1 only at boot — a full walk of candidates is 117+ sequential
+    // requests; see the heavy-collections comment above.
+    safe(
+      (async () => (await fetchCollectionPage('candidates', 1, { pageSize: 100 })).items)(),
+      'candidates',
+    ),
     includeHeavy ? safe(fetchCollection('harvests'), 'harvests') : Promise.resolve(undefined),
     safe(fetchOpenQuestions(), 'open-questions'),
     safe(fetchResolvedQuestions(), 'open-questions-resolved'),
     safe(fetchCollection('assessments'), 'assessments'),
     safe(fetchCollection('observations'), 'observations'),
-    includeHeavy ? safe(fetchCollection('agent-records'), 'agent-records') : Promise.resolve(undefined),
+    includeHeavy
+      // Page 1 only at boot — the full list walk (~82 sequential pages) is
+      // background-filled WITH record bodies by
+      // dataService.ensureAgentRecordContent(); see the heavy-collections
+      // comment above.
+      ? safe((async () => (await fetchCollectionPage('agent-records', 1, { pageSize: 100 })).items)(), 'agent-records')
+      : Promise.resolve(undefined),
     safe(fetchCollection('specifications'), 'specifications'),
     safe(fetchCollection('plans'), 'plans'),
     safe(fetchSpecs(), 'specs'),
@@ -418,16 +456,25 @@ export async function loadAllData(opts: LoadAllDataOpts = {}): Promise<Record<st
   // Small forums request full bodies (previews); large forums request only a
   // recent body window so the boot payload stays light. Skippable for fast
   // background polls where the thread count hasn't changed.
+  // Page 1 only at boot — full per-forum walks of the big forums (syslog,
+  // change-log, transcripts: 500-thread pages each) dominated boot. The rest
+  // of each list is background-filled by dataService.ensureThreadsFull().
   const threadsBySlug: Record<string, any[]> = {};
+  const threadsTotals: Record<string, number | null> = {};
   if (!opts.skipThreads && Array.isArray(forums) && forums.length > 0) {
     const threadResults = await Promise.allSettled(
       forums.map((f: any) =>
-        fetchThreads(f.slug, threadBodyPolicy(f.threadCount)).then(t => ({ slug: f.slug, threads: t }))
+        fetchThreadsPage(f.slug, 1, threadBodyPolicy(f.threadCount)).then(t => ({
+          slug: f.slug,
+          items: t.items,
+          total: t.total,
+        }))
       )
     );
     for (const r of threadResults) {
       if (r.status === 'fulfilled') {
-        threadsBySlug[r.value.slug] = r.value.threads;
+        threadsBySlug[r.value.slug] = r.value.items;
+        threadsTotals[r.value.slug] = typeof r.value.total === 'number' ? r.value.total : null;
       }
     }
   }
@@ -438,6 +485,7 @@ export async function loadAllData(opts: LoadAllDataOpts = {}): Promise<Record<st
     assessments, observations, agentRecords, specifications, plans, specs,
     users, counts,
     _threadsBySlug: threadsBySlug,
+    _threadsTotals: threadsTotals,
   };
 }
 

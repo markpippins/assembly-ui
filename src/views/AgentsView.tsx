@@ -7,6 +7,7 @@ import { EmptyState } from '../components/EmptyState';
 import { dataService } from '../services/dataService';
 import { useLiveData } from '../context/LiveDataContext';
 import { useToast } from '../context/ToastContext';
+import { useWindowed, WindowFooter } from '../utils/useWindowed';
 import { formatDateTime } from '../utils/format';
 import { AgentRecord } from '../types';
 
@@ -52,9 +53,12 @@ export const AgentsView: React.FC = () => {
  return sortDir === 'asc' ? cmp : -cmp;
  });
  return items;
- }, [records, sortField, sortDir]);
+ }, [records, sortField, sortDir]);  // Windowed rendering: only `visibleCount` rows ever mount; the footer
+  // sentinel / "show more" grows the window. Re-sorts restart at one chunk
+  // (resetKey) so full-list sorting stays instant.
+  const agentWindow = useWindowed(sorted.length, 150, `${sortField}:${sortDir}`);
 
- const onToggleSort = (field: SortField) => {
+  const onToggleSort = (field: SortField) => {
  const next = toggleSort(field, sortField, sortDir);
  setSortField(next.field);
  setSortDir(next.dir);
@@ -95,7 +99,6 @@ export const AgentsView: React.FC = () => {
  subtitle="Agent records across the Assembly."
  ttsContent="Agent records catalog."
  />
-
  {records.length === 0 ? (
  <EmptyState
  icon={Bot}
@@ -130,7 +133,7 @@ export const AgentsView: React.FC = () => {
  </tr>
  </thead>
  <tbody className="divide-y divide-slate-100 ">
- {sorted.map((rec) => (
+ {agentWindow.slice(sorted).map((rec) => (
  <tr key={rec.id} className="hover:bg-slate-50 :bg-slate-700/30 transition-colors">
  <td className="py-3 px-4">
  <div className="flex flex-col">
@@ -168,6 +171,13 @@ export const AgentsView: React.FC = () => {
  </tbody>
  </table>
  </div>
+ <WindowFooter
+ sentinelRef={agentWindow.sentinelRef}
+ visibleCount={agentWindow.visibleCount}
+ total={sorted.length}
+ onMore={() => agentWindow.more()}
+ noun="records"
+ />
  </div>
  )}
 
