@@ -19,6 +19,13 @@ export default defineConfig(({ mode }) => {
     // Allow ASSEMBLY_ prefixed env vars in import.meta.env (in addition to VITE_).
     envPrefix: ['VITE_', 'ASSEMBLY_'],
     server: {
+      // Hosts accepted by Vite's Host-header check. It refuses unknown Host
+      // values even when bound to 0.0.0.0, so the LAN name comes from the
+      // environment (bin/start-nexus-uis.sh installs it) rather than the repo.
+      allowedHosts: (process.env.NEXUS_UI_ALLOWED_HOSTS ?? '')
+        .split(',')
+        .map((h) => h.trim())
+        .filter(Boolean),
       host: "0.0.0.0",
       port,
       // Disable HMR when DISABLE_HMR=true (systemd): `hmr: false` stops
